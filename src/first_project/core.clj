@@ -81,7 +81,7 @@
 
 
 ; Operator OR vraca prvu true vrednost ili zadnju vrednost
-; Operator AND vraca prvu fals vrednost ili ako nema false vrednosti poslednju true
+; Operator AND vraca prvu false vrednost ili ako nema false vrednosti poslednju true
 
 
 ; OR
@@ -146,6 +146,9 @@
 
 (def person {:first-name "Zeljko"
              :last-name "Stojkovic"})
+
+(or person (throw NullPointerException))
+
 
 (identity person)
 
@@ -291,8 +294,10 @@
 (let [x 1] x)                                               ; Menja x ali samo u kontekstu te funckije u globalnom kontekstu i dalje je 0
 (identity x)
 
-(let [ [pongo & dalmatians & dalmatians2] dalmatian-list]
-  [pongo dalmatians])
+
+; & dalmatians2
+(let [ [pongo ponogo2 pongo23 & dalmatians]  dalmatian-list]
+  [pongo ponogo2 pongo23 dalmatians])
 
 (into [] (set [:a :a :b]))
 
@@ -328,4 +333,56 @@
   (set coll))
 (mapset [1 1 2 2])
 
+(clojure.string/split "zeljko je kralj", #" ")
 
+(= (nth '(4 5 6 7) 2) 6)
+
+
+(nth [1 2 3] 0) ()
+
+
+
+(myNth [1 2 3] 0)
+
+
+(get [1 2 3] 1)
+
+
+
+(nth '(4 5 6 7) 2)
+
+(map inc [1 2 3 4 5])
+
+; Sta treba da napisem? Treba da prodjem kroz celu listu i
+; da vratim objekat koji je na mestu i, znaci treba listu da pomerim na i poziciju
+
+(map count ["zeljko", "nesto", "nesto123"])
+
+(def person [{:name "Pera" :age 30} {:name "Zeljko" :age 25}])
+
+(reduce map :age person)
+(count person )
+
+(/ (reduce + (map :age person)) (count person))
+
+;; domaci slican primen za svoj domen, 3-4 primera
+
+
+;; (reduce (fn [acc e]  [(inc (acc 0)) (+ (acc 1) e)]))
+
+
+(apply / (reduce (fn [[cnt sum] e] [(+ sum e) (inc cnt)])
+                 [0 0]
+                 [1 2 3]))
+;; 6 / 3 = 2
+; [ (inc (acc 0) (+ (acc 1) e)])
+(reduce + (map :age person))
+
+
+;; uzima akumulator i element
+;; akumulator je 0 prvi element je 30
+;; posto radi reduce on vraca 0 i 30 => 30
+;; prelazi na drugi element akumulator je sada 30 a drugi element je 25
+;; sada je akumulator 55 a nema vise elemenata i to je vraceno
+;; akumulator mu ne treba, moze i bez akumulatora
+(/ 6 3)
