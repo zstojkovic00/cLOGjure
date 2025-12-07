@@ -11,4 +11,4 @@ pom.xml.asc
 /.prepl-port
 .hgignore
 .hg/
-resources/spark1GB.log
+resources/spark300MB.log

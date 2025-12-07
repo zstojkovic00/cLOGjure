@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/cLOGjure.iml" filepath="$PROJECT_DIR$/cLOGjure.iml" />
+      <module fileurl="file://$PROJECT_DIR$/clogjure.iml" filepath="$PROJECT_DIR$/clogjure.iml" />
       <module fileurl="file://$PROJECT_DIR$/clojure-project.iml" filepath="$PROJECT_DIR$/clojure-project.iml" />
     </modules>
   </component>
