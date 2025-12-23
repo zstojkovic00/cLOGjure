@@ -18,9 +18,34 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="Leiningen: nrepl:1.0.0" level="project" />
-    <orderEntry type="library" name="Leiningen: org.clojure/clojure:1.11.1" level="project" />
-    <orderEntry type="library" name="Leiningen: org.clojure/core.specs.alpha:0.2.62" level="project" />
-    <orderEntry type="library" name="Leiningen: org.clojure/spec.alpha:0.3.218" level="project" />
+    <orderEntry type="library" name="Leiningen: org.apache.commons/commons-math3:3.6.1" level="project" />
+    <orderEntry type="library" name="Leiningen: org.bytedeco/javacpp-platform:1.5.12" level="project" />
+    <orderEntry type="library" name="Leiningen: org.bytedeco/javacpp:1.5.12" level="project" />
+    <orderEntry type="library" name="Leiningen: org.bytedeco/javacpp:1.5.12:android-arm64" level="project" />
+    <orderEntry type="library" name="Leiningen: org.bytedeco/javacpp:1.5.12:android-x86_64" level="project" />
+    <orderEntry type="library" name="Leiningen: org.bytedeco/javacpp:1.5.12:ios-arm64" level="project" />
+    <orderEntry type="library" name="Leiningen: org.bytedeco/javacpp:1.5.12:ios-x86_64" level="project" />
+    <orderEntry type="library" name="Leiningen: org.bytedeco/javacpp:1.5.12:linux-arm64" level="project" />
+    <orderEntry type="library" name="Leiningen: org.bytedeco/javacpp:1.5.12:linux-ppc64le" level="project" />
+    <orderEntry type="library" name="Leiningen: org.bytedeco/javacpp:1.5.12:linux-riscv64" level="project" />
+    <orderEntry type="library" name="Leiningen: org.bytedeco/javacpp:1.5.12:linux-x86_64" level="project" />
+    <orderEntry type="library" name="Leiningen: org.bytedeco/javacpp:1.5.12:macosx-arm64" level="project" />
+    <orderEntry type="library" name="Leiningen: org.bytedeco/javacpp:1.5.12:macosx-x86_64" level="project" />
+    <orderEntry type="library" name="Leiningen: org.bytedeco/javacpp:1.5.12:windows-x86_64" level="project" />
+    <orderEntry type="library" name="Leiningen: org.bytedeco/mkl-platform:2025.2-1.5.12" level="project" />
+    <orderEntry type="library" name="Leiningen: org.bytedeco/mkl:2025.2-1.5.12" level="project" />
+    <orderEntry type="library" name="Leiningen: org.bytedeco/mkl:2025.2-1.5.12:linux-x86_64" level="project" />
+    <orderEntry type="library" name="Leiningen: org.bytedeco/mkl:2025.2-1.5.12:linux-x86_64-redist" level="project" />
+    <orderEntry type="library" name="Leiningen: org.bytedeco/mkl:2025.2-1.5.12:windows-x86_64" level="project" />
+    <orderEntry type="library" name="Leiningen: org.clojure/clojure:1.12.3" level="project" />
+    <orderEntry type="library" name="Leiningen: org.clojure/core.specs.alpha:0.4.74" level="project" />
+    <orderEntry type="library" name="Leiningen: org.clojure/spec.alpha:0.5.238" level="project" />
+    <orderEntry type="library" name="Leiningen: org.clojure/tools.logging:1.3.0" level="project" />
     <orderEntry type="library" name="Leiningen: org.nrepl/incomplete:0.1.0" level="project" />
+    <orderEntry type="library" name="Leiningen: org.uncomplicate/clojure-cpp:0.6.0" level="project" />
+    <orderEntry type="library" name="Leiningen: org.uncomplicate/neanderthal-base:0.60.0" level="project" />
+    <orderEntry type="library" name="Leiningen: org.uncomplicate/neanderthal-mkl:0.60.0" level="project" />
+    <orderEntry type="library" name="Leiningen: uncomplicate/commons:0.19.0" level="project" />
+    <orderEntry type="library" name="Leiningen: uncomplicate/fluokitten:0.10.0" level="project" />
   </component>
 </module>
