@@ -1,22 +1,24 @@
-# first-project
+# cLOGjure
 
-A Clojure library designed to ... well, that part is up to you.
+CLI application that enables semantic search over large application log files. It works by building an inverted index and timestamp index from the log file, then using statistical ranking algorithms (TF-IDF, BM25) to return the most relevant results for a query.
 
 ## Usage
+```bash
+# Build indexes (one-time)
+clogjure index logs/app.log
 
-FIXME
+# Search with ranking
+clogjure search "memory leak error" --from 2024-01-01 --top 10
+```
 
-## License
+# How it works
 
-Copyright © 2025 FIXME
+1. **Indexing**: Parses the log file and creates two indexes
+    - Inverted index: maps each word to byte offsets where it appears
+    - Timestamp index: maps byte offsets to timestamps
 
-This program and the accompanying materials are made available under the
-terms of the Eclipse Public License 2.0 which is available at
-http://www.eclipse.org/legal/epl-2.0.
-
-This Source Code may also be made available under the following Secondary
-Licenses when the conditions for such availability set forth in the Eclipse
-Public License, v. 2.0 are satisfied: GNU General Public License as published by
-the Free Software Foundation, either version 2 of the License, or (at your
-option) any later version, with the GNU Classpath Exception which is available
-at https://www.gnu.org/software/classpath/license.html.
+2. **Searching**: Takes your query and finds matching log lines
+    - Finds intersection of byte offsets for query terms
+    - Filters by timestamp range if specified
+    - Calculates TF-IDF/BM25 scores for each match
+    - Returns top N results sorted by relevance
