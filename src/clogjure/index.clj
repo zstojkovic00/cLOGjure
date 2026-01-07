@@ -3,10 +3,8 @@
             [clojure.string :as str])
   (:import (java.time ZonedDateTime)))
 
-(def log-path "resources/logs/file.log")
-(def log-path-300MB "resources/logs/spark300MB.log")
-(def inverted-index-path "resources/logs/inverted.idx")
-(def timestamp-index-path "resources/logs/timestamp.idx")
+
+(def index-path "resources/indexes/")
 
 (defn tokenize
   "Splits a log line into individual lowercase nonempty words."
@@ -19,31 +17,42 @@
   [timestamp]
   (try
     (.toEpochMilli (.toInstant (ZonedDateTime/parse timestamp)))
-    (catch Exception e nil)))
+    (catch Exception _ nil)))
+
+(defn to-index-path
+  "Creates index path from log path and index type."
+  [log-path
+   index-type]
+  (let [file (io/file log-path)
+        filename (.getName file)
+        filename-clean (str/replace filename #"\.[^.]+$" "")]
+    (str index-path filename-clean "-" (name index-type) ".idx"))
+  )
+
 
 (defn create-index
   "Reads a log file line-by-line and returns two sorted in-memory indexes in a single pass
   [inverted-index (word -> vector of byte offsets where each word appears)
   timestamp-index (byte offset -> unix timestamp for each line)]
   "
-  [filepath]
-  (with-open [rdr (io/reader filepath)]
+  [log-path]
+  (with-open [rdr (io/reader log-path)]
     (let [indexes
           (reduce
-            (fn [[inverted-acc ts-acc current-offset] line]
+            (fn [[outer-inverted-acc timestamp-acc current-offset] line]
               (let [words (tokenize line)
                     timestamp (to-unix-time (first words))
                     line-length (count (.getBytes line))
                     new-offset (+ current-offset line-length 1)
 
                     updated-timestamp-index (if timestamp
-                                              (assoc ts-acc current-offset timestamp)
-                                              ts-acc)
+                                              (assoc timestamp-acc current-offset timestamp)
+                                              timestamp-acc)
 
                     updated-inverted-index (reduce
-                                             (fn [inner-acc word]
-                                               (update-in inner-acc [:words word] (fnil conj []) current-offset))
-                                             inverted-acc
+                                             (fn [inner-inverted-acc word]
+                                               (update-in inner-inverted-acc [:words word] (fnil conj []) current-offset))
+                                             outer-inverted-acc
                                              words)]
                 [updated-inverted-index updated-timestamp-index new-offset]))
             [{:words {}} {} 0]
@@ -58,22 +67,35 @@
 (defn persist-index-async
   "Persists the in-memory indexes to disk asynchronously.
    Returns a future that completes when both indexes have been written to disk."
-  [inverted-index
+  [log-path
+   inverted-index
    timestamp-index]
   (future
-    (with-open [w (io/writer timestamp-index-path)]
-      (doseq [[offset ts] timestamp-index]
-        (.write w (str offset "," ts "\n"))))
+    (with-open [w (io/writer (to-index-path log-path :timestamp))]
+      (doseq [[offset timestamp] timestamp-index]
+        (.write w (str offset "," timestamp "\n")))
+      )
 
-    (with-open [w (io/writer inverted-index-path)]
+    (with-open [w (io/writer (to-index-path log-path :inverted))]
       (doseq [[word offsets] (:words inverted-index)]
-        (.write w (str word " " (str/join " " offsets) "\n")))))
+        (.write w (str word " " (str/join " " offsets) "\n")))
+      )
+    )
   )
 
 (defn load-index
-  "Loads a previously persisted index from disk into memory"
-  []
-  (println "Not implemented")
+  "Loads a previously persisted index from disk into memory."
+  [index-path]
+  (with-open [rdr (io/reader index-path)]
+    {:words (into (sorted-map)
+                  (for [line (line-seq rdr)]
+                    (let [[word & offsets-string] (str/split line #" ")
+                          offsets (mapv #(Long/parseLong %) offsets-string)]
+                      [word offsets]
+                      )
+                    )
+                  )}
+    )
   )
 
 (def get-or-create-index
@@ -85,9 +107,14 @@
 
    Returns the inverted index."
   (memoize
-    (fn []
-      (if (.exists (io/file inverted-index-path))
-        (load-index)
-        (let [[inverted-index timestamp-index] (create-index log-path)]
-          (persist-index-async inverted-index timestamp-index)
-          inverted-index)))))
+    (fn [log-path]
+      (let [index-path (to-index-path log-path :inverted)]
+        (if (.exists (io/file index-path))
+          (load-index index-path)
+          (let [[inverted-index timestamp-index] (create-index log-path)]
+            (persist-index-async log-path inverted-index timestamp-index)
+            inverted-index))
+        )
+      )
+    )
+  )
