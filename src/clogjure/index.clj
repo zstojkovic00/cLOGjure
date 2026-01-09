@@ -3,7 +3,7 @@
             [clojure.string :as str])
   (:import (java.time ZonedDateTime)))
 
-
+;; HELPERS
 (def index-path "resources/indexes/")
 
 (defn tokenize
@@ -29,7 +29,7 @@
     (str index-path filename-clean "-" (name index-type) ".idx"))
   )
 
-
+;; CREATE
 (defn create-index
   "Reads a log file line-by-line and returns two sorted in-memory indexes in a single pass
   [inverted-index (word -> vector of byte offsets where each word appears)
@@ -83,6 +83,17 @@
     )
   )
 
+
+;; READ
+(defn list-indexes
+  "Returns all available inverted index files from disk."
+  []
+  (filter #(str/ends-with? % "-inverted.idx")
+          (map #(.getName %)
+               (.listFiles (io/file index-path)))
+          )
+  )
+
 (defn load-index
   "Loads a previously persisted index from disk into memory."
   [index-path]
@@ -98,6 +109,7 @@
     )
   )
 
+;; TODO: support for index-path
 (def get-or-create-index
   "Memoized function that implements lazy index loading
 
