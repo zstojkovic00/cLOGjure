@@ -1,4 +1,6 @@
 (ns clogjure.search
-  (:require [clojure.java.io :as io]
-            [clojure.string :as str]
-            [clogjure.index :as index]))
+  (:require [clogjure.state :as state]))
+
+(defn by-keywords [keywords]
+  (let [index @state/current-index]
+    index))

@@ -1,9 +1,9 @@
 (ns clogjure.core
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
-            [clogjure.index :as idx]))
-
-(def current-index (atom nil))
+            [clogjure.index :as idx]
+            [clogjure.search :as search]
+            [clogjure.state :as state]))
 
 ;; TODO: add validation if args > 1
 (defn create-index
@@ -14,7 +14,7 @@
     (if (not (.exists (io/file log-path)))
       (println (str "File not found: " log-path))
       (let [loaded (idx/get-or-create-index log-path)]
-        (reset! current-index loaded)
+        (reset! state/current-index loaded)
         (println (str "Index loaded: " log-path))))))
 
 (defn list-indexes
@@ -37,25 +37,24 @@
           match (first (filter (fn [index] (str/starts-with? index index-name)) indexes))]
       (if match
         (let [loaded (idx/load-index (str idx/index-path match))]
-          (reset! current-index loaded)
+          (reset! state/current-index loaded)
           (println (str "Loaded: " match)))
         (println (str "Index not found: " index-name))))))
 
 (defn search
   "Searches the current index for a keywords"
   [keywords]
-  (if (nil? @current-index)
+  (if (nil? @state/current-index)
     (println "No index loaded. Use index or use command first.")
     (if (nil? keywords)
       (println "Usage: search <keywords>")
-      (println current-index))))
+      (search/by-keywords keywords))))
 
 (defn clear-screen
   "Clears the terminal screen."
   []
   (print "\033[H\033[2J")
   (flush))
-
 
 (defn -main
   "Starts the interactive CLI, reads and executes commands"
