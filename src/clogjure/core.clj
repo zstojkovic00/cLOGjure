@@ -13,8 +13,9 @@
     (println "Usage: index <path-to-log-file>")
     (if (not (.exists (io/file log-path)))
       (println (str "File not found: " log-path))
-      (let [loaded (idx/get-or-create-index log-path)]
-        (reset! state/current-index loaded)
+      (let [[inverted-index timestamp-index] (idx/get-or-create-index log-path)]
+        (reset! state/current-index inverted-index)
+        (reset! state/current-index-total-lines (count timestamp-index))
         (println (str "Index loaded: " log-path))))))
 
 (defn list-indexes
@@ -36,9 +37,10 @@
     (let [indexes (idx/list-indexes)
           match (first (filter (fn [index] (str/starts-with? index index-name)) indexes))]
       (if match
-        (let [loaded (idx/load-index (str idx/index-path match))]
-          (reset! state/current-index loaded)
-          (println (str "Loaded: " match)))
+        (let [[inverted-index timestamp-index] (idx/load-index match)]
+          (reset! state/current-index inverted-index)
+          (reset! state/current-index-total-lines (count timestamp-index))
+          (println (str "Index loaded: " match)))
         (println (str "Index not found: " index-name))))))
 
 (defn search
@@ -48,7 +50,7 @@
     (println "No index loaded. Use index or use command first.")
     (if (nil? keywords)
       (println "Usage: search <keywords>")
-      (search/by-keywords keywords))))
+      (search/by-keyword keywords))))
 
 (defn clear-screen
   "Clears the terminal screen."
@@ -77,3 +79,16 @@
       )
     )
   )
+
+
+;;; REPL Testing
+(let [ [inverted-index timestamp_index] (idx/create-index "resources/logs/file.log")]
+  (idx/persist-index-async "resources/logs/file.log" inverted-index timestamp_index)
+  )
+;
+(idx/list-indexes)
+(idx/get-or-create-index "resources/logs/file.log")
+(select-index "file-inverted.idx")
+(deref state/current-index)
+(deref state/current-index-total-lines)
+(reset! state/current-index nil)
