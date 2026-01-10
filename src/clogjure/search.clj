@@ -3,4 +3,5 @@
 
 (defn by-keywords [keywords]
   (let [index @state/current-index]
-    index))
+    index)
+  )

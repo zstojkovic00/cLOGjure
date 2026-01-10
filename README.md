@@ -1,24 +1,23 @@
 # cLOGjure
 
-CLI application that enables semantic search over large application log files. It works by building an inverted index and timestamp index from the log file, then using statistical ranking algorithms (TF-IDF, BM25) to return the most relevant results for a query.
+Lightweight in-memory full-text search engine for large log files. Builds an inverted index and uses TF-IDF ranking to return the most relevant results.
 
 ## Usage
-```bash
-# Build indexes (one-time)
-clogjure index logs/app.log
 
-# Search with ranking
-clogjure search "memory leak error" --from 2024-01-01 --top 10
+```bash
+lein run
 ```
 
-# How it works
+```
+clogjure> index logs/app.log    # Create index from log file
+clogjure> ls                    # List available indexes
+clogjure> use app-inverted.idx  # Load existing index
+clogjure> search error          # Search for keyword/s
+clogjure> clear                 # Clear screen
+clogjure> exit                  # Exit
+```
 
-1. **Indexing**: Parses the log file and creates two indexes
-    - Inverted index: maps each word to byte offsets where it appears
-    - Timestamp index: maps byte offsets to timestamps
+## How it works
 
-2. **Searching**: Takes your query and finds matching log lines
-    - Finds intersection of byte offsets for query terms
-    - Filters by timestamp range if specified
-    - Calculates TF-IDF/BM25 scores for each match
-    - Returns top N results sorted by relevance
+- **Indexing** - Parses log file, creates inverted index (word → byte offsets)
+- **Search** - O(1) lookup in memory, seeks to byte offset in original file
