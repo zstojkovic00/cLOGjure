@@ -1,38 +1,49 @@
 (ns clogjure.search
-  (:require [clogjure.state :as state]
-            [clojure.string :as str]))
+  (:require [clogjure.index :as idx]
+            [clogjure.state :as state]
+            [clojure.set :as set]))
 
 (defn tf
-  "Term Frequency - how many times this offset appears in offsets list."
+  "Calculates Term Frequency - counts how many times a word appears in a log line."
   [offsets offset]
   (count (filter #(= % offset) offsets)))
 
-;; TODO: add validation divided by zero
 (defn idf
-  "Inverse Document Frequency - how rare a word is across the log."
+  "Calculates Inverse Document Frequency - measures how rare a word is across the log.
+   Formula: log(N / df) where N = total log lines, df = lines containing the word."
   [total-lines lines-with-word]
   (Math/log (/ total-lines lines-with-word)))
 
 (defn tf-idf
-  "TF-IDF score for a word in a specific line.
-   Formula: tf * idf."
+  "Calculates TF-IDF score for ranking a word's relevance in a log line.
+   Formula: TF × IDF. Higher score = more relevant result."
   [tf idf]
   (* tf idf))
 
-;; TODO: add validation if word is not found
-(defn by-keyword
-  "Search exact by keyword, returns TF-IDF score per offset"
-  [keyword]
-  (let [index @state/current-index
-        offsets (get-in index [:words keyword] [])
-        total-lines @state/current-index-total-lines
-        lines-with-word (distinct offsets)
-        idf-score (idf total-lines (count lines-with-word))]
-    (map
-      (fn [offset]
-        (let [tf-score (tf offsets offset)]
-          {:offset offset
-           :score  (tf-idf tf-score idf-score)}))
-      lines-with-word)))
+(defn offsets-intersection
+  "Finds intersection of offsets for multiple keywords."
+  [index keywords]
+  (let [offset-sets (map (fn [keyword]
+                           (set (get-in index [:words keyword] [])))
+                         keywords)]
+    (vec (apply set/intersection offset-sets))))
 
-(by-keyword "zstojkovic00")
+(defn by-exact-keywords
+  "Search by multiple keywords, returns lines containing all keywords,
+   ranked by TF-IDF score."
+  [keywords log-path]
+  (let [index @state/current-index
+        offsets (offsets-intersection index keywords)]
+    (if (empty? offsets)
+      (println "No results found.")
+      (let [total-lines @state/current-index-total-lines
+            lines-with-words (distinct offsets)
+            lines (idx/load-index-lines lines-with-words log-path)
+            idf-score (idf total-lines (count lines-with-words))]
+        (mapv
+         (fn [{:keys [offset line]}]
+           (let [tf-score (tf offsets offset)]
+             {:offset offset
+              :score  (tf-idf tf-score idf-score)
+              :line   line}))
+         lines)))))

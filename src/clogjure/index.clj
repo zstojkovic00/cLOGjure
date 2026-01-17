@@ -1,10 +1,11 @@
 (ns clogjure.index
   (:require [clojure.java.io :as io]
-            [clojure.string :as str])
-  (:import (java.time ZonedDateTime)))
+            [clojure.string :as str]
+            [clogjure.util :as util])
+  (:import (java.io RandomAccessFile)))
 
-;; HELPERS
 (def index-path "resources/indexes/")
+(def registry-path "resources/indexes/index-registry.idx")
 
 (defn tokenize
   "Splits a log line into individual lowercase alphanumeric words."
@@ -12,25 +13,14 @@
   (let [clean (str/replace (str/lower-case line) #"[^a-z0-9]" " ")]
     (filter not-empty (str/split clean #" +"))))
 
-(defn to-unix-time
-  "Converts an ISO8601 timestamp string to Unix time in milliseconds.
-   Returns nil if the timestamp cannot be parsed."
-  [timestamp]
-  (try
-    (.toEpochMilli (.toInstant (ZonedDateTime/parse timestamp)))
-    (catch Exception _ nil)))
-
 (defn to-index-path
   "Creates index path from log path and index type."
-  [log-path
-   index-type]
+  [log-path index-type]
   (let [file (io/file log-path)
         filename (.getName file)
         filename-clean (str/replace filename #"\.[^.]+$" "")]
-    (str index-path filename-clean "-" (name index-type) ".idx"))
-  )
+    (str index-path filename-clean "-" (name index-type) ".idx")))
 
-;; CREATE
 (defn create-index
   "Reads a log file line-by-line and returns two sorted in-memory indexes in a single pass
   [inverted-index (word -> vector of byte offsets where each word appears)
@@ -40,62 +30,72 @@
   (with-open [rdr (io/reader log-path)]
     (let [indexes
           (reduce
-            (fn [[outer-inverted-acc timestamp-acc current-offset] line]
-              (let [words (tokenize line)
-                    timestamp (to-unix-time (first (str/split line #" ")))
-                    line-length (count (.getBytes line))
-                    new-offset (+ current-offset line-length 1)
+           (fn [[outer-inverted-acc timestamp-acc current-offset] line]
+             (let [words (tokenize line)
+                   timestamp (util/to-unix-timestamp line)
+                   line-length (count (.getBytes line))
+                   new-offset (+ current-offset line-length 1)
 
-                    updated-timestamp-index (if timestamp
-                                              (assoc timestamp-acc current-offset timestamp)
-                                              timestamp-acc)
+                   updated-timestamp-index (if timestamp
+                                             (assoc timestamp-acc current-offset timestamp)
+                                             timestamp-acc)
 
-                    updated-inverted-index (reduce
-                                             (fn [inner-inverted-acc word]
-                                               (update-in inner-inverted-acc [:words word] (fnil conj []) current-offset))
-                                             outer-inverted-acc
-                                             words)]
-                [updated-inverted-index updated-timestamp-index new-offset]))
-            [{:words {}} {} 0]
-            (line-seq rdr))]
+                   updated-inverted-index (reduce
+                                           (fn [inner-inverted-acc word]
+                                             (update-in inner-inverted-acc [:words word] (fnil conj []) current-offset))
+                                           outer-inverted-acc
+                                           words)]
+               [updated-inverted-index updated-timestamp-index new-offset]))
+           [{:words {}} {} 0]
+           (line-seq rdr))]
 
       (let [[inverted-index timestamp-index _] indexes]
         [(assoc inverted-index :words (into (sorted-map) (:words inverted-index)))
-         timestamp-index]
-        )
-      )))
+         timestamp-index]))))
 
 (defn persist-index-async
-  "Persists the in-memory indexes to disk asynchronously.
-   Returns a future that completes when both indexes have been written to disk."
-  [log-path
-   inverted-index
-   timestamp-index]
-  (future
-    (with-open [w (io/writer (to-index-path log-path :timestamp))]
-      (doseq [[offset timestamp] timestamp-index]
-        (.write w (str offset " " timestamp "\n")))
-      )
+  "Persists in-memory indexes to disk asynchronously.
+   Returns a future that completes when indexes and registry have been written."
+  [log-path inverted-index timestamp-index]
+  (let [index-name (-> (to-index-path log-path :inverted) io/file .getName)]
+    (future
+      (with-open [w (io/writer (to-index-path log-path :timestamp))]
+        (doseq [[offset timestamp] timestamp-index]
+          (.write w (str offset " " timestamp "\n"))))
 
-    (with-open [w (io/writer (to-index-path log-path :inverted))]
-      (doseq [[word offsets] (:words inverted-index)]
-        (.write w (str word " " (str/join " " offsets) "\n")))
-      )
-    )
-  )
+      (with-open [w (io/writer (to-index-path log-path :inverted))]
+        (doseq [[word offsets] (:words inverted-index)]
+          (.write w (str word " " (str/join " " offsets) "\n"))))
 
-;; READ
+      ;; TODO: proveri da li postoji log u registry-path pre append-a
+      (with-open [w (io/writer registry-path :append true)]
+        (.write w (str index-name " " log-path "\n"))))))
+
 (defn list-indexes
   "Returns all available inverted index files from disk."
   []
   (filter #(str/ends-with? % "-inverted.idx")
           (map #(.getName %)
-               (.listFiles (io/file index-path)))
-          )
-  )
+               (.listFiles (io/file index-path)))))
+
+(defn list-registry
+  "Returns all available index names from disk."
+  []
+  (if (.exists (io/file registry-path))
+    (with-open [rdr (io/reader registry-path)]
+      (into {}
+            (for [line (line-seq rdr)]
+              (let [[index-name log-path] (str/split line #" " 2)]
+                [index-name log-path]))))
+    {}))
+
+(defn load-log-path
+  "Loads log path for given index name from registry."
+  [index-name]
+  (get (list-registry) index-name))
 
 (defn load-inverted-index
-  "Loads a previously persisted inverted index from disk into memory."
+  "Loads inverted index from disk into memory."
   [index-path]
   (with-open [rdr (io/reader index-path)]
     {:words (into (sorted-map)
@@ -105,46 +105,43 @@
                       [word offsets])))}))
 
 (defn load-timestamp-index
-  "Loads a previously persisted timestamp index from disk into memory."
+  "Loads timestamp index from disk into memory."
   [index-path]
   (with-open [rdr (io/reader index-path)]
     (into {}
           (for [line (line-seq rdr)]
-            (let [
-                  [offset timestamp] (str/split line #" ")]
-                  [(Long/parseLong offset) (Long/parseLong timestamp)])
-            ))
-    )
-  )
+            (let [[offset timestamp] (str/split line #" ")]
+              [(Long/parseLong offset) (Long/parseLong timestamp)])))))
 
 (defn load-index
-  "Loads both inverted and timestamp indexes from disk into memory."
-  [index-name]
-  (let [base-name (str/replace index-name #"-inverted\.idx$" "")]
-    [(load-inverted-index (str index-path base-name "-inverted.idx"))
-     (load-timestamp-index (str index-path base-name "-timestamp.idx"))
-     ]
-    )
-  )
+  "Loads inverted and timestamp indexes from disk into memory."
+  [log-path]
+  (let [inverted-index (load-inverted-index (to-index-path log-path :inverted))
+        timestamp-index (load-timestamp-index (to-index-path log-path :timestamp))]
+    [inverted-index timestamp-index]))
 
-(def get-or-create-index
+(def load-or-create-index
   "Memoized function that implements lazy index loading.
 
    1. Checks memory (via memoization) - returns immediately if already loaded
    2. Checks disk - loads from disk if index files exist
-   3. Builds from log file - creates new index and persists to disk asynchronously if not found
-
-   Returns [inverted-index timestamp-index]."
+   3. Builds from log file - creates new index and persists to disk asynchronously if not found."
   (memoize
-    (fn [log-path]
-      (let [inverted-path (to-index-path log-path :inverted)
-            index-name (.getName (io/file inverted-path))]
-        (if (.exists (io/file inverted-path))
-          (load-index index-name)
-          (let [[inverted-index timestamp-index] (create-index log-path)]
-            (persist-index-async log-path inverted-index timestamp-index)
-            [inverted-index timestamp-index]))
-        )
-      )
-    )
-  )
+   (fn [log-path]
+     (let [inverted-path (to-index-path log-path :inverted)]
+       (if (.exists (io/file inverted-path))
+         (load-index log-path)
+         (let [[inverted-index timestamp-index] (create-index log-path)]
+           (persist-index-async log-path inverted-index timestamp-index)
+           [inverted-index timestamp-index]))))))
+
+(defn load-index-lines
+  ""
+  [offsets log-path]
+  (with-open [raf (RandomAccessFile. ^String log-path "r")]
+    (mapv
+     (fn [offset]
+       (.seek raf offset)
+       {:offset offset
+        :line   (.readLine raf)})
+     offsets)))

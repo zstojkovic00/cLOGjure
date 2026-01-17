@@ -5,18 +5,17 @@
             [clogjure.search :as search]
             [clogjure.state :as state]))
 
-;; TODO: add validation if args > 1
 (defn create-index
   "Creates a new index from a log file path and sets it as current."
   [log-path]
-  (if (nil? log-path)
-    (println "Usage: index <path-to-log-file>")
-    (if (not (.exists (io/file log-path)))
-      (println (str "File not found: " log-path))
-      (let [[inverted-index timestamp-index] (idx/get-or-create-index log-path)]
-        (reset! state/current-index inverted-index)
-        (reset! state/current-index-total-lines (count timestamp-index))
-        (println (str "Index loaded: " log-path))))))
+  (cond
+    (nil? log-path) (println "Usage: index <path-to-log-file>")
+    (not (.exists (io/file log-path))) (println (str "File not found: " log-path))
+    :else (let [[inverted-index timestamp-index] (idx/load-or-create-index log-path)]
+            (reset! state/current-index inverted-index)
+            (reset! state/current-index-total-lines (count timestamp-index))
+            (reset! state/current-index-log-path log-path)
+            (println (str "Index loaded: " log-path)))))
 
 (defn list-indexes
   "Lists all available indexes."
@@ -27,8 +26,6 @@
       (doseq [index indexes]
         (println (str "  " index))))))
 
-;; TODO: add validation if args > 1
-;; TODO: add validation if index is same as current one
 (defn select-index
   "Selects and loads an existing index by name."
   [index-name]
@@ -37,26 +34,43 @@
     (let [indexes (idx/list-indexes)
           match (first (filter (fn [index] (str/starts-with? index index-name)) indexes))]
       (if match
-        (let [[inverted-index timestamp-index] (idx/load-index match)]
+        (let [log-path (idx/load-log-path match)
+              [inverted-index timestamp-index] (idx/load-index log-path)]
           (reset! state/current-index inverted-index)
           (reset! state/current-index-total-lines (count timestamp-index))
+          (reset! state/current-index-log-path log-path)
           (println (str "Index loaded: " match)))
         (println (str "Index not found: " index-name))))))
 
 (defn search
-  "Searches the current index for a keywords"
+  "Searches the current index for keywords"
   [keywords]
   (if (nil? @state/current-index)
     (println "No index loaded. Use index or use command first.")
-    (if (nil? keywords)
-      (println "Usage: search <keywords>")
-      (search/by-keyword keywords))))
+    (if (empty? keywords)
+      (println "Usage: search <keyword1 keyword2 ...>")
+      (let [results (search/by-exact-keywords keywords @state/current-index-log-path)]
+        (when (seq results)
+          (let [sorted (sort-by :score > results)]
+            (println (str "Found " (count sorted) " results:\n"))
+            (doseq [{:keys [score line]} sorted]
+              (println (format "[%.2f] %s" (double score) line)))))))))
 
 (defn clear-screen
   "Clears the terminal screen."
   []
   (print "\033[H\033[2J")
   (flush))
+
+(defn index-status
+  "Prints out index information about currently loaded index"
+  []
+  (if (nil? @state/current-index)
+    (println "No index loaded.")
+    (let [log-path @state/current-index-log-path
+          index-name (idx/to-index-path log-path :inverted)]
+      (println (str "Index:    " index-name))
+      (println (str "Log path: " log-path)))))
 
 (defn -main
   "Starts the interactive CLI, reads and executes commands"
@@ -70,25 +84,10 @@
         "index" (create-index (first args))
         "ls" (list-indexes)
         "use" (select-index (first args))
+        "status" (index-status)
         "search" (search args)
         "clear" (clear-screen)
         "exit" :exit
         (println "Command does not exist"))
       (when-not (= command "exit")
-        (recur))
-      )
-    )
-  )
-
-
-;;; REPL Testing
-(let [ [inverted-index timestamp_index] (idx/create-index "resources/logs/file.log")]
-  (idx/persist-index-async "resources/logs/file.log" inverted-index timestamp_index)
-  )
-;
-(idx/list-indexes)
-(idx/get-or-create-index "resources/logs/file.log")
-(select-index "file-inverted.idx")
-(deref state/current-index)
-(deref state/current-index-total-lines)
-(reset! state/current-index nil)
+        (recur)))))
