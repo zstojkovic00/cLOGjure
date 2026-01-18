@@ -1,24 +1,23 @@
 (ns clogjure.core
-  (:require [clojure.java.io :as io]
-            [clojure.string :as str]
-            [clogjure.index :as idx]
+  (:require [clogjure.index :as idx]
             [clogjure.search :as search]
-            [clogjure.state :as state]))
+            [clogjure.state :as state]
+            [clojure.java.io :as io]
+            [clojure.string :as str]))
 
 (defn create-index
-  "Creates a new index from a log file path and sets it as current."
+  "Creates a new index from log file and sets it as current."
   [log-path]
   (cond
     (nil? log-path) (println "Usage: index <path-to-log-file>")
     (not (.exists (io/file log-path))) (println (str "File not found: " log-path))
-    :else (let [[inverted-index timestamp-index] (idx/load-or-create-index log-path)]
-            (reset! state/current-index inverted-index)
-            (reset! state/current-index-total-lines (count timestamp-index))
-            (reset! state/current-index-log-path log-path)
+    :else (do
+            (idx/load-or-create-index log-path)
+            (reset! state/current-session-log-path log-path)
             (println (str "Index loaded: " log-path)))))
 
 (defn list-indexes
-  "Lists all available indexes."
+  "Prints all available index names to console."
   []
   (let [indexes (idx/list-indexes)]
     (if (empty? indexes)
@@ -34,22 +33,21 @@
     (let [indexes (idx/list-indexes)
           match (first (filter (fn [index] (str/starts-with? index index-name)) indexes))]
       (if match
-        (let [log-path (idx/load-log-path match)
-              [inverted-index timestamp-index] (idx/load-index log-path)]
-          (reset! state/current-index inverted-index)
-          (reset! state/current-index-total-lines (count timestamp-index))
-          (reset! state/current-index-log-path log-path)
+        (let [log-path (idx/load-log-path match)]
+          (idx/load-or-create-index log-path)
+          (reset! state/current-session-log-path log-path)
           (println (str "Index loaded: " match)))
         (println (str "Index not found: " index-name))))))
 
 (defn search
-  "Searches the current index for keywords"
-  [keywords]
-  (if (nil? @state/current-index)
+  "Searches the current index for words.
+   Prints results ranked by relevance."
+  [words]
+  (if (nil? @state/current-session-log-path)
     (println "No index loaded. Use index or use command first.")
-    (if (empty? keywords)
-      (println "Usage: search <keyword1 keyword2 ...>")
-      (let [results (search/by-exact-keywords keywords @state/current-index-log-path)]
+    (if (empty? words)
+      (println "Usage: search <word1 word2 ...>")
+      (let [results (search/by-exact-words words @state/current-session-log-path nil nil)]
         (when (seq results)
           (let [sorted (sort-by :score > results)]
             (println (str "Found " (count sorted) " results:\n"))
@@ -63,11 +61,11 @@
   (flush))
 
 (defn index-status
-  "Prints out index information about currently loaded index"
+  "Prints current index information."
   []
-  (if (nil? @state/current-index)
+  (if (nil? @state/current-session-log-path)
     (println "No index loaded.")
-    (let [log-path @state/current-index-log-path
+    (let [log-path @state/current-session-log-path
           index-name (idx/to-index-path log-path :inverted)]
       (println (str "Index:    " index-name))
       (println (str "Log path: " log-path)))))

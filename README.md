@@ -12,7 +12,7 @@ lein run
 clogjure> index logs/app.log    # Create index from log file
 clogjure> ls                    # List available indexes
 clogjure> use app-inverted.idx  # Load existing index
-clogjure> search error          # Search for keyword/s
+clogjure> search error          # Search for word/s
 clogjure> clear                 # Clear screen
 clogjure> exit                  # Exit
 ```

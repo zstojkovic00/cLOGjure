@@ -8,13 +8,15 @@
 (def registry-path "resources/indexes/index-registry.idx")
 
 (defn tokenize
-  "Splits a log line into individual lowercase alphanumeric words."
+  "Splits a log line into lowercase alphanumeric words.
+   Returns vector of strings."
   [line]
   (let [clean (str/replace (str/lower-case line) #"[^a-z0-9]" " ")]
     (filter not-empty (str/split clean #" +"))))
 
 (defn to-index-path
-  "Creates index path from log path and index type."
+  "Creates index file path from log path and index type.
+   Returns string path."
   [log-path index-type]
   (let [file (io/file log-path)
         filename (.getName file)
@@ -22,9 +24,10 @@
     (str index-path filename-clean "-" (name index-type) ".idx")))
 
 (defn create-index
-  "Reads a log file line-by-line and returns two sorted in-memory indexes in a single pass
-  [inverted-index (word -> vector of byte offsets where each word appears)
-  timestamp-index (byte offset -> unix timestamp for each line)]
+  "Parses log file line-by-line.
+  Returns two sorted in-memory indexes in a single pass
+  inverted-index (word -> vector of byte offsets where each word appears)
+  timestamp-index (byte offset -> unix timestamp for each line)
   "
   [log-path]
   (with-open [rdr (io/reader log-path)]
@@ -72,14 +75,16 @@
         (.write w (str index-name " " log-path "\n"))))))
 
 (defn list-indexes
-  "Returns all available inverted index files from disk."
+  "Lists all available inverted index files from disk.
+   Returns vector of index filenames."
   []
   (filter #(str/ends-with? % "-inverted.idx")
           (map #(.getName %)
                (.listFiles (io/file index-path)))))
 
 (defn list-registry
-  "Returns all available index names from disk."
+  "Lists all index entries from registry file.
+   Returns map of index-name to log-path."
   []
   (if (.exists (io/file registry-path))
     (with-open [rdr (io/reader registry-path)]
@@ -90,12 +95,14 @@
     {}))
 
 (defn load-log-path
-  "Loads log path for given index name from registry."
+  "Loads log path for given index name from registry.
+   Returns string path or nil."
   [index-name]
   (get (list-registry) index-name))
 
 (defn load-inverted-index
-  "Loads inverted index from disk into memory."
+  "Loads inverted index from disk into memory.
+   Returns map of words to byte offsets."
   [index-path]
   (with-open [rdr (io/reader index-path)]
     {:words (into (sorted-map)
@@ -105,7 +112,8 @@
                       [word offsets])))}))
 
 (defn load-timestamp-index
-  "Loads timestamp index from disk into memory."
+  "Loads timestamp index from disk into memory.
+   Returns map of byte offsets to unix timestamps."
   [index-path]
   (with-open [rdr (io/reader index-path)]
     (into {}
@@ -114,7 +122,8 @@
               [(Long/parseLong offset) (Long/parseLong timestamp)])))))
 
 (defn load-index
-  "Loads inverted and timestamp indexes from disk into memory."
+  "Loads indexes from disk.
+   Returns vector of [inverted-index timestamp-index]."
   [log-path]
   (let [inverted-index (load-inverted-index (to-index-path log-path :inverted))
         timestamp-index (load-timestamp-index (to-index-path log-path :timestamp))]
@@ -122,10 +131,12 @@
 
 (def load-or-create-index
   "Memoized function that implements lazy index loading.
+    1. Checks memory (via memoization) - returns immediately if already loaded
+    2. Checks disk - loads from disk if index files exist
+    3. Builds from log file - creates new index and persists to disk asynchronously if not found.
 
-   1. Checks memory (via memoization) - returns immediately if already loaded
-   2. Checks disk - loads from disk if index files exist
-   3. Builds from log file - creates new index and persists to disk asynchronously if not found."
+   Returns vector of [inverted-index timestamp-index].
+   "
   (memoize
    (fn [log-path]
      (let [inverted-path (to-index-path log-path :inverted)]
@@ -135,8 +146,23 @@
            (persist-index-async log-path inverted-index timestamp-index)
            [inverted-index timestamp-index]))))))
 
+(defn get-inverted-offsets
+  "Returns vector of byte offsets for a word from index.
+   Returns empty vector if word not found."
+  [index word]
+  (get-in index [:words word] []))
+
+(defn get-timestamp-offsets
+  "Returns all offsets within time range [from, to]."
+  [timestamp-index from to]
+  (vec (for [[offset ts] timestamp-index
+             :when (and (or (nil? from) (>= ts from))
+                        (or (nil? to) (<= ts to)))]
+         offset)))
+
 (defn load-index-lines
-  ""
+  "Reads lines from file at given byte offsets.
+   Returns vector of {:offset :line} maps."
   [offsets log-path]
   (with-open [raf (RandomAccessFile. ^String log-path "r")]
     (mapv

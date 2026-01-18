@@ -7,7 +7,7 @@
 
 (defn load-dt-formatters
   "Loads timestamp patterns from config file.
-   Each line contains: regex|datetime-format"
+   Returns vector of {:regex :formatter} maps."
   []
   (let [formatters (slurp formatters-path)
         lines (str/split-lines formatters)]
