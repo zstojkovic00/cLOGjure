@@ -20,17 +20,25 @@
   [tf idf]
   (* tf idf))
 
+;; TODO: write test
 (defn intersection
   "Finds intersection of multiple offset vectors.
    Returns vector of offsets present in all input vectors."
-  [offset-vectors]
-  (if (empty? offset-vectors)
+  [offsets]
+  (if (empty? offsets)
     []
-    (let [offset-sets (map set offset-vectors)]
+    (let [offset-sets (map set offsets)]
       (vec (apply set/intersection offset-sets)))))
 
-(defn by-exact-words
-  "Searches log by multiple words with optional time filter.
+;; TODO: write test
+(defn union
+  "Finds distinct union of multiple offset vectors
+  Returns vector of offsets"
+  [])
+
+;; TODO: write test
+(defn by-and-words
+  "Searches log by multiple words [objasnjenje AND logike] with optional time filter.
    Returns vector of {:offset :score :line} maps ranked by TF-IDF."
   [words log-path from to]
   (let [[inverted-index timestamp-index] (idx/load-or-create-index log-path)
@@ -51,3 +59,13 @@
               :score  (tf-idf tf-score idf-score)
               :line   line}))
          lines)))))
+
+;; TODO: write test
+(defn by-prefix-words
+  "Searches log by multiple words that starts with substr and optional time filter"
+  [])
+
+;; TODO: write test
+(defn by-or-words
+  "Searches log by multiple words [objasnjenje OR logike] with optional time filter"
+  [])

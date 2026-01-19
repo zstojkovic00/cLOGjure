@@ -34,13 +34,14 @@
     (let [indexes
           (reduce
            (fn [[outer-inverted-acc timestamp-acc current-offset] line]
-             (let [words (tokenize line)
-                   timestamp (util/to-unix-timestamp line)
+             (let [[timestamp content] (util/split-line-by-timestamp line)
+                   unix-timestamp (if timestamp (util/to-unix-timestamp timestamp) nil)
+                   words (tokenize content)
                    line-length (count (.getBytes line))
                    new-offset (+ current-offset line-length 1)
 
-                   updated-timestamp-index (if timestamp
-                                             (assoc timestamp-acc current-offset timestamp)
+                   updated-timestamp-index (if unix-timestamp
+                                             (assoc timestamp-acc current-offset unix-timestamp)
                                              timestamp-acc)
 
                    updated-inverted-index (reduce
@@ -121,6 +122,20 @@
             (let [[offset timestamp] (str/split line #" ")]
               [(Long/parseLong offset) (Long/parseLong timestamp)])))))
 
+(defn get-inverted-offsets
+  "Returns vector of byte offsets for a word from index.
+   Returns empty vector if word not found."
+  [index word]
+  (get-in index [:words word] []))
+
+(defn get-timestamp-offsets
+  "Returns all offsets within time range [from, to]."
+  [timestamp-index from to]
+  (vec (for [[offset ts] timestamp-index
+             :when (and (or (nil? from) (>= ts from))
+                        (or (nil? to) (<= ts to)))]
+         offset)))
+
 (defn load-index
   "Loads indexes from disk.
    Returns vector of [inverted-index timestamp-index]."
@@ -146,20 +161,7 @@
            (persist-index-async log-path inverted-index timestamp-index)
            [inverted-index timestamp-index]))))))
 
-(defn get-inverted-offsets
-  "Returns vector of byte offsets for a word from index.
-   Returns empty vector if word not found."
-  [index word]
-  (get-in index [:words word] []))
-
-(defn get-timestamp-offsets
-  "Returns all offsets within time range [from, to]."
-  [timestamp-index from to]
-  (vec (for [[offset ts] timestamp-index
-             :when (and (or (nil? from) (>= ts from))
-                        (or (nil? to) (<= ts to)))]
-         offset)))
-
+;; TODO: Memory mapping
 (defn load-index-lines
   "Reads lines from file at given byte offsets.
    Returns vector of {:offset :line} maps."

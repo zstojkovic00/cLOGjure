@@ -2,8 +2,21 @@
   (:require [clogjure.index :as idx]
             [clogjure.search :as search]
             [clogjure.state :as state]
+            [clogjure.util :as util]
             [clojure.java.io :as io]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [clojure.tools.cli]))
+
+(def search-cli-options
+  [["-h" "--help"]
+   ["-f" "--from FROM" "start time filter"
+    :parse-fn util/to-unix-timestamp
+    :validate [some? "Invalid date format.
+                      Use: yyyy-MM-ddTHH:mm, example: 2026-05-01T10:00"]]
+   ["-t" "--to TO" "end time filter"
+    :parse-fn util/to-unix-timestamp
+    :validate [some? "Invalid date format.
+                      Use: yyyy-MM-ddTHH:mm, example: 2026-05-01T12:00"]]])
 
 (defn create-index
   "Creates a new index from log file and sets it as current."
@@ -42,12 +55,18 @@
 (defn search
   "Searches the current index for words.
    Prints results ranked by relevance."
-  [words]
-  (if (nil? @state/current-session-log-path)
-    (println "No index loaded. Use index or use command first.")
-    (if (empty? words)
-      (println "Usage: search <word1 word2 ...>")
-      (let [results (search/by-exact-words words @state/current-session-log-path nil nil)]
+  [args]
+  (let [{:keys [options arguments errors]}
+        (clojure.tools.cli/parse-opts args search-cli-options)
+        words arguments
+        from  (:from options)
+        to    (:to options)]
+    (cond
+      errors (doseq [err errors] (println err))
+      (nil? @state/current-session-log-path) (println "No index loaded. Use index or use command first.")
+      (empty? words) (println "Usage: search <word> [--from date] [--to date]")
+      :else
+      (let [results (search/by-and-words words @state/current-session-log-path from to)]
         (when (seq results)
           (let [sorted (sort-by :score > results)]
             (println (str "Found " (count sorted) " results:\n"))
