@@ -29,17 +29,6 @@
       (.toEpochMilli (.toInstant zoned-dt)))
     (catch Exception _ nil)))
 
-;; TODO: refactor this
-(defn split-line-by-timestamp
-  "Splits log line by timestamp.
-   Returns vector timestamp-string content or nil line if no timestamp found."
-  [line]
-  (let [matched (first (filter #(re-find (:regex %) line) dt-formatters))]
-    (if matched
-      (let [match (re-find (:regex matched) line)]
-        [match (str/trim (subs line (count match)))])
-      [nil line])))
-
 (defn to-unix-timestamp
   "Tries to parse timestamp string with given formatters from config file until one matches.
   Returns unix time in milliseconds or nil."

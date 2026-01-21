@@ -20,7 +20,6 @@
   [tf idf]
   (* tf idf))
 
-;; TODO: write test
 (defn intersection
   "Finds intersection of multiple offset vectors.
    Returns vector of offsets present in all input vectors."
@@ -30,22 +29,24 @@
     (let [offset-sets (map set offsets)]
       (vec (apply set/intersection offset-sets)))))
 
-;; TODO: write test
 (defn union
   "Finds distinct union of multiple offset vectors
-  Returns vector of offsets"
-  [])
+  Returns vector of unique offsets for all input vectors"
+  [offsets]
+  (if (empty? offsets)
+    []
+    (let [offsets-set (map set offsets)]
+      (vec (apply set/union offsets-set)))))
 
-;; TODO: write test
 (defn by-and-words
-  "Searches log by multiple words [objasnjenje AND logike] with optional time filter.
+  "Searches log by multiple words by AND logic with optional time filter.
    Returns vector of {:offset :score :line} maps ranked by TF-IDF."
   [words log-path from to]
   (let [[inverted-index timestamp-index] (idx/load-or-create-index log-path)
         timestamp-offsets (when (or from to) (idx/get-timestamp-offsets timestamp-index from to))
         word-offsets (map (fn [word] (idx/get-inverted-offsets inverted-index word)) words)
-        offsets (if timestamp-offsets (cons timestamp-offsets word-offsets) word-offsets)
-        intersected-offsets (intersection offsets)]
+        all-offsets (if timestamp-offsets (cons timestamp-offsets word-offsets) word-offsets)
+        intersected-offsets (intersection all-offsets)]
     (if (empty? intersected-offsets)
       (println "No results found.")
       (let [total-lines (count timestamp-index)
@@ -53,19 +54,59 @@
             lines (idx/load-index-lines lines-with-words log-path)
             idf-score (idf total-lines (count lines-with-words))]
         (mapv
-         (fn [{:keys [offset line]}]
-           (let [tf-score (tf intersected-offsets offset)]
-             {:offset offset
-              :score  (tf-idf tf-score idf-score)
-              :line   line}))
-         lines)))))
+          (fn [{:keys [offset line]}]
+            (let [tf-score (tf intersected-offsets offset)]
+              {:offset offset
+               :score  (tf-idf tf-score idf-score)
+               :line   line}))
+          lines)))))
 
-;; TODO: write test
 (defn by-prefix-words
-  "Searches log by multiple words that starts with substr and optional time filter"
-  [])
+  "Searches log by multiple words that starts with given prefixes and optional time filter
+  Returns vector of {:offset :score :line} maps ranked by TF-IDF."
+  [prefixes log-path from to]
+  (let [[inverted-index timestamp-index] (idx/load-or-create-index log-path)
+        timestamp-offsets (when (or from to) (idx/get-timestamp-offsets timestamp-index from to))
+        matching-words (mapcat (fn [prefix]
+                                 (take-while (fn [word] (.startsWith word prefix))
+                                             (map key (subseq (:words inverted-index) >= prefix))))
+                               prefixes)
+        word-offsets (map (fn [word] (idx/get-inverted-offsets inverted-index word)) matching-words)
+        union-offsets (union word-offsets)
+        intersected-offsets (intersection (if timestamp-offsets [union-offsets timestamp-offsets] [union-offsets]))]
+    (if (empty? intersected-offsets)
+      (println "No results found.")
+      (let [total-lines (count timestamp-index)
+            lines-with-words intersected-offsets
+            lines (idx/load-index-lines lines-with-words log-path)
+            idf-score (idf total-lines (count lines-with-words))]
+        (mapv
+          (fn [{:keys [offset line]}]
+            (let [tf-score (tf intersected-offsets offset)]
+              {:offset offset
+               :score  (tf-idf tf-score idf-score)
+               :line   line}))
+          lines)))))
 
-;; TODO: write test
 (defn by-or-words
-  "Searches log by multiple words [objasnjenje OR logike] with optional time filter"
-  [])
+  "Searches log by multiple words OR logic with optional time filter
+   Returns vector of {:offset :score :line} maps ranked by TF-IDF."
+  [words log-path from to]
+  (let [[inverted-index timestamp-index] (idx/load-or-create-index log-path)
+        timestamp-offsets (when (or from to) (idx/get-timestamp-offsets timestamp-index from to))
+        word-offsets (map (fn [word] (idx/get-inverted-offsets inverted-index word)) words)
+        union-offsets (union word-offsets)
+        intersected-offsets (intersection (if timestamp-offsets [union-offsets timestamp-offsets] [union-offsets]))]
+    (if (empty? intersected-offsets)
+      (println "No results found.")
+      (let [total-lines (count timestamp-index)
+            lines-with-words intersected-offsets
+            lines (idx/load-index-lines lines-with-words log-path)
+            idf-score (idf total-lines (count lines-with-words))]
+        (mapv
+          (fn [{:keys [offset line]}]
+            (let [tf-score (tf intersected-offsets offset)]
+              {:offset offset
+               :score  (tf-idf tf-score idf-score)
+               :line   line}))
+          lines)))))

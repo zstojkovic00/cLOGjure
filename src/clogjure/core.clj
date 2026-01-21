@@ -9,14 +9,15 @@
 
 (def search-cli-options
   [["-h" "--help"]
+   ["-A" "--any" "match ANY word (OR logic)"]
+   ["-a" "--all" "match ALL words (AND logic)"]
+   ["-p" "--prefix" "search by word prefix"]
    ["-f" "--from FROM" "start time filter"
     :parse-fn util/to-unix-timestamp
-    :validate [some? "Invalid date format.
-                      Use: yyyy-MM-ddTHH:mm, example: 2026-05-01T10:00"]]
+    :validate [some? "Invalid date format."]]
    ["-t" "--to TO" "end time filter"
     :parse-fn util/to-unix-timestamp
-    :validate [some? "Invalid date format.
-                      Use: yyyy-MM-ddTHH:mm, example: 2026-05-01T12:00"]]])
+    :validate [some? "Invalid date format."]]])
 
 (defn create-index
   "Creates a new index from log file and sets it as current."
@@ -53,24 +54,26 @@
         (println (str "Index not found: " index-name))))))
 
 (defn search
-  "Searches the current index for words.
-   Prints results ranked by relevance."
   [args]
   (let [{:keys [options arguments errors]}
         (clojure.tools.cli/parse-opts args search-cli-options)
         words arguments
-        from  (:from options)
-        to    (:to options)]
+        from (:from options)
+        to (:to options)
+        search-fn (cond
+                    (:prefix options) search/by-prefix-words
+                    (:any options) search/by-or-words
+                    :else search/by-and-words)]
     (cond
       errors (doseq [err errors] (println err))
-      (nil? @state/current-session-log-path) (println "No index loaded. Use index or use command first.")
-      (empty? words) (println "Usage: search <word> [--from date] [--to date]")
+      (nil? @state/current-session-log-path) (println "No index loaded.")
+      (empty? words) (println "Usage: search <words> [--any] [--prefix] [--from DATE] [--to DATE]")
       :else
-      (let [results (search/by-and-words words @state/current-session-log-path from to)]
-        (when (seq results)
-          (let [sorted (sort-by :score > results)]
-            (println (str "Found " (count sorted) " results:\n"))
-            (doseq [{:keys [score line]} sorted]
+      (let [matching-lines (search-fn words @state/current-session-log-path from to)]
+        (when (seq matching-lines)
+          (let [sorted-matching-lines (sort-by :score > matching-lines)]
+            (println (str "Found " (count sorted-matching-lines) " results:\n"))
+            (doseq [{:keys [score line]} sorted-matching-lines]
               (println (format "[%.2f] %s" (double score) line)))))))))
 
 (defn clear-screen

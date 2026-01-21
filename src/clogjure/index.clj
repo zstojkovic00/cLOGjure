@@ -7,21 +7,27 @@
 (def index-path "resources/indexes/")
 (def registry-path "resources/indexes/index-registry.idx")
 
+(defn split-line-by-timestamp
+  "Splits log line by timestamp.
+   Returns vector of unix-timestamp and content or nil line if no timestamp found."
+  [line]
+  (let [matched (some (fn [{:keys [regex formatter]}]
+                        (let [match (re-find regex line)]
+                          (when match
+                            {:match match :formatter formatter})))
+                      util/dt-formatters)]
+    (if matched
+      (let [unix-timestamp (util/try-parse-timestamp (:match matched) (:formatter matched))
+            content (str/trim (subs line (count (:match matched))))]
+        [unix-timestamp content])
+      [nil line])))
+
 (defn tokenize
   "Splits a log line into lowercase alphanumeric words.
    Returns vector of strings."
   [line]
   (let [clean (str/replace (str/lower-case line) #"[^a-z0-9]" " ")]
     (filter not-empty (str/split clean #" +"))))
-
-(defn to-index-path
-  "Creates index file path from log path and index type.
-   Returns string path."
-  [log-path index-type]
-  (let [file (io/file log-path)
-        filename (.getName file)
-        filename-clean (str/replace filename #"\.[^.]+$" "")]
-    (str index-path filename-clean "-" (name index-type) ".idx")))
 
 (defn create-index
   "Parses log file line-by-line.
@@ -34,8 +40,7 @@
     (let [indexes
           (reduce
            (fn [[outer-inverted-acc timestamp-acc current-offset] line]
-             (let [[timestamp content] (util/split-line-by-timestamp line)
-                   unix-timestamp (if timestamp (util/to-unix-timestamp timestamp) nil)
+             (let [[unix-timestamp content] (split-line-by-timestamp line)
                    words (tokenize content)
                    line-length (count (.getBytes line))
                    new-offset (+ current-offset line-length 1)
@@ -57,6 +62,15 @@
         [(assoc inverted-index :words (into (sorted-map) (:words inverted-index)))
          timestamp-index]))))
 
+(defn to-index-path
+  "Creates index file path from log path and index type.
+   Returns string path."
+  [log-path index-type]
+  (let [file (io/file log-path)
+        filename (.getName file)
+        filename-clean (str/replace filename #"\.[^.]+$" "")]
+    (str index-path filename-clean "-" (name index-type) ".idx")))
+
 (defn persist-index-async
   "Persists in-memory indexes to disk asynchronously.
    Returns a future that completes when indexes and registry have been written."
@@ -71,9 +85,10 @@
         (doseq [[word offsets] (:words inverted-index)]
           (.write w (str word " " (str/join " " offsets) "\n"))))
 
-      ;; TODO: proveri da li postoji log u registry-path pre append-a
-      (with-open [w (io/writer registry-path :append true)]
-        (.write w (str index-name " " log-path "\n"))))))
+      (let [registry (list-registry)]
+        (if (nil? (get registry index-name))
+          (with-open [w (io/writer registry-path :append true)]
+            (.write w (str index-name " " log-path "\n"))))))))
 
 (defn list-indexes
   "Lists all available inverted index files from disk.
@@ -126,7 +141,7 @@
   "Returns vector of byte offsets for a word from index.
    Returns empty vector if word not found."
   [index word]
-  (get-in index [:words word] []))
+  (get-in index [:words (str/lower-case word)] []))
 
 (defn get-timestamp-offsets
   "Returns all offsets within time range [from, to]."
