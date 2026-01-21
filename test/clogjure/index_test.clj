@@ -6,20 +6,20 @@
 (facts "split-line-by-timestamp -> tokenize flow"
        (fact "Spring Boot log line"
              (let [line "2025-12-05T22:17:01.524+01:00 INFO 7605 --- server started"
-                   [timestamp content] (util/split-line-by-timestamp line)]
-               timestamp => "2025-12-05T22:17:01.524+01:00"
+                   [unix-timestamp content] (idx/split-line-by-timestamp line)]
+               unix-timestamp => integer?
                content => "INFO 7605 --- server started"
                (idx/tokenize content) => ["info" "7605" "server" "started"]))
        (fact "European format log line"
              (let [line "14.01.2026 00:00:00.005 [scheduler] INFO task completed"
-                   [timestamp content] (util/split-line-by-timestamp line)]
-               timestamp => "14.01.2026 00:00:00.005"
+                   [unix-timestamp content] (idx/split-line-by-timestamp line)]
+               unix-timestamp => integer?
                content => "[scheduler] INFO task completed"
                (idx/tokenize content) => ["scheduler" "info" "task" "completed"]))
        (fact "line without timestamp"
              (let [line "SLF4J: Class path contains multiple bindings"
-                   [timestamp content] (util/split-line-by-timestamp line)]
-               timestamp => nil
+                   [unix-timestamp content] (idx/split-line-by-timestamp line)]
+               unix-timestamp => nil
                content => "SLF4J: Class path contains multiple bindings"
                (idx/tokenize content) => ["slf4j" "class" "path" "contains" "multiple" "bindings"])))
 
@@ -38,8 +38,8 @@
                (get-in inverted-index [:words "zeljko"]) => vector?)
          (fact "word zeljko appears in 2 lines"
                (count (get-in inverted-index [:words "zeljko"])) => 2)
-         (fact "timestamp-index has 3 entries (one per line)"
-               (count timestamp-index) => 3)))
+         (fact "timestamp-index has 10 entries (one per line)"
+               (count timestamp-index) => 10)))
 
 (def timestamp-index {0   (util/to-unix-timestamp "2026-01-19T10:00:00")
                       100 (util/to-unix-timestamp "2026-01-19T10:01:00")
