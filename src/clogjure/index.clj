@@ -71,6 +71,18 @@
         filename-clean (str/replace filename #"\.[^.]+$" "")]
     (str index-path filename-clean "-" (name index-type) ".idx")))
 
+(defn list-registry
+  "Lists all index entries from registry file.
+   Returns map of index-name to log-path."
+  []
+  (if (.exists (io/file registry-path))
+    (with-open [rdr (io/reader registry-path)]
+      (into {}
+            (for [line (line-seq rdr)]
+              (let [[index-name log-path] (str/split line #" " 2)]
+                [index-name log-path]))))
+    {}))
+
 (defn persist-index-async
   "Persists in-memory indexes to disk asynchronously.
    Returns a future that completes when indexes and registry have been written."
@@ -97,18 +109,6 @@
   (filter #(str/ends-with? % "-inverted.idx")
           (map #(.getName %)
                (.listFiles (io/file index-path)))))
-
-(defn list-registry
-  "Lists all index entries from registry file.
-   Returns map of index-name to log-path."
-  []
-  (if (.exists (io/file registry-path))
-    (with-open [rdr (io/reader registry-path)]
-      (into {}
-            (for [line (line-seq rdr)]
-              (let [[index-name log-path] (str/split line #" " 2)]
-                [index-name log-path]))))
-    {}))
 
 (defn load-log-path
   "Loads log path for given index name from registry.

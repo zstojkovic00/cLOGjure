@@ -1,6 +1,6 @@
 # cLOGjure
 
-Lightweight in-memory full-text search engine for large log files. Builds an inverted index and uses TF-IDF ranking to return the most relevant results.
+Lightweight in-memory full-text search engine for log files. Builds an inverted index and uses TF-IDF ranking to return the most relevant results.
 
 ## How it works
 
@@ -8,8 +8,19 @@ Lightweight in-memory full-text search engine for large log files. Builds an inv
 2. **Search** - O(1) lookup for exact match, O(log n + k) for prefix ; seeks to byte offset to read lines
 3. **Ranking** - TF-IDF scoring (Term Frequency × Inverse Document Frequency)
 
+### Demo
+![demo](demo.gif)
+
 ## Usage
 
+### Docker
+
+```bash
+docker build -t clogjure .
+docker run -it clogjure
+```
+
+### Lein
 ```bash
 lein midje ## run tests
 lein run
@@ -47,3 +58,4 @@ clogjure> search error warning --any       # Lines containing error OR warning
 clogjure> search err --prefix              # Lines with words starting with err
 clogjure> search error --from 2026-01-19T10:00:00 --to 2026-01-19T12:00:00
 ```
+
