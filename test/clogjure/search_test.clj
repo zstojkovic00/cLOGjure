@@ -3,16 +3,6 @@
             [clogjure.search :as search]
             [clogjure.util :as util]))
 
-(facts "Term Frequency, calculates how many times words appears in a log line "
-       (fact "word appears only once"
-             (search/tf [0 100 200] 0) => 1)
-       (fact "word appears multiple times"
-             (search/tf [0 0 100 200] 0) => 2
-             (search/tf [0 0 0 0 0 100] 0) => 5)
-       (fact "word does not appear"
-             (search/tf [0 0 100] 500) => 0
-             (search/tf [] 0) => 0))
-
 (fact "Inverse Document Frequency, calculates how rare word is across log"
       (fact "word appears five times in log of 100 lines"
             (search/idf 100 5) => (roughly 2.9 0.1))
