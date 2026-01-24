@@ -2,7 +2,8 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [clogjure.util :as util])
-  (:import (java.io RandomAccessFile)))
+  (:import (java.nio.channels FileChannel FileChannel$MapMode)
+           (java.nio.file StandardOpenOption)))
 
 (def index-path "resources/indexes/")
 (def registry-path "resources/indexes/index-registry.idx")
@@ -159,32 +160,51 @@
         timestamp-index (load-timestamp-index (to-index-path log-path :timestamp))]
     [inverted-index timestamp-index]))
 
+(defn memory-map-file
+  "Maps a file directly into user space memory via MappedByteBuffer.
+   Allows efficient random access without kernel/user space data copying.
+   Returns a MappedByteBuffer over the entire file."
+  [log-path]
+  (let [path (.toPath (io/file log-path))
+        channel (FileChannel/open path (into-array [StandardOpenOption/READ]))
+        mapped-byte-buffer (.map channel FileChannel$MapMode/READ_ONLY 0 (.size channel))]
+    (.close channel)
+    mapped-byte-buffer))
+
 (def load-or-create-index
   "Memoized function that implements lazy index loading.
     1. Checks memory (via memoization) - returns immediately if already loaded
     2. Checks disk - loads from disk if index files exist
     3. Builds from log file - creates new index and persists to disk asynchronously if not found.
 
-   Returns vector of [inverted-index timestamp-index].
-   "
+   Returns vector of [inverted-index timestamp-index memory-mapped-log]."
   (memoize
    (fn [log-path]
-     (let [inverted-path (to-index-path log-path :inverted)]
+     (let [inverted-path (to-index-path log-path :inverted)
+           memory-mapped-log (memory-map-file log-path)]
        (if (.exists (io/file inverted-path))
-         (load-index log-path)
+         (let [[inverted-index timestamp-index] (load-index log-path)]
+           [inverted-index timestamp-index memory-mapped-log])
          (let [[inverted-index timestamp-index] (create-index log-path)]
            (persist-index-async log-path inverted-index timestamp-index)
-           [inverted-index timestamp-index]))))))
+           [inverted-index timestamp-index memory-mapped-log]))))))
 
-;; TODO: Memory mapping
 (defn load-index-lines
-  "Reads lines from file at given byte offsets.
-   Returns vector of {:offset :line} maps."
-  [offsets log-path]
-  (with-open [raf (RandomAccessFile. ^String log-path "r")]
+  "Reads each line byte by byte until newline or end of buffer
+   from memory-mapped file at given byte offsets.
+   Returns vector of [offset line] maps."
+  [offsets memory-mapped-log]
+  (let [buffer-size (.limit memory-mapped-log)
+        newline (byte 10)] ;; ASCII character for \n
     (mapv
      (fn [offset]
-       (.seek raf offset)
-       {:offset offset
-        :line   (.readLine raf)})
+       (let [sb (StringBuilder.)]
+         (loop [position (int offset)]
+           (if (>= position buffer-size)
+             {:offset offset :line (.toString sb)}
+             (let [current-byte (.get memory-mapped-log (int position))]
+               (if (= current-byte newline)
+                 {:offset offset :line (.toString sb)}
+                 (do (.append sb (char current-byte))
+                     (recur (inc position)))))))))
      offsets)))
