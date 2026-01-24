@@ -289,22 +289,22 @@ Funkcija `memory-map-file` mapira ceo log fajl u memoriju. Zatvaranje `FileChann
 Funkcija `load-index-lines` cita linije direktno iz mapiranog bafera. Za svaki offset, cita se bajt po bajt dok se ne naidje na newline karakter (ASCII 10) ili kraj bafera:
 
 ```clojure
-(defn load-index-lines
-   [offsets memory-mapped-log]
-   (let [buffer-size (.limit memory-mapped-log)
-         newline (byte 10)] ;; ASCII character for \n
-      (mapv
-         (fn [offset]
-            (let [sb (StringBuilder.)]
-               (loop [position (int offset)]
-                  (if (>= position buffer-size)
-                     {:offset offset :line (.toString sb)}
-                     (let [current-byte (.get memory-mapped-log (int position))]
-                        (if (= current-byte newline)
-                           {:offset offset :line (.toString sb)}
-                           (do (.append sb (char current-byte))
-                               (recur (inc position)))))))))
-         offsets)))
+  [offsets ^MappedByteBuffer memory-mapped-log]
+(let [buffer-size (.limit memory-mapped-log)
+      newline (byte 10)]                                  ;; ASCII character for \n
+   (mapv
+      (fn [offset]
+         (let [sb (StringBuilder.)]
+            (.position memory-mapped-log (int offset))
+            (loop []
+               (if (>= (.position memory-mapped-log) buffer-size)
+                  {:offset offset :line (.toString sb)}
+                  (let [current-byte (.get memory-mapped-log)]
+                     (if (= current-byte newline)
+                        {:offset offset :line (.toString sb)}
+                        (do (.append sb (char current-byte))
+                            (recur))))))))
+      offsets)))
 ```
 
 

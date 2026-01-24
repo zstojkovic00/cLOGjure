@@ -1,8 +1,9 @@
 (ns clogjure.index
-  (:require [clojure.java.io :as io]
-            [clojure.string :as str]
-            [clogjure.util :as util])
+  (:require [clogjure.util :as util]
+            [clojure.java.io :as io]
+            [clojure.string :as str])
   (:import (java.nio.channels FileChannel FileChannel$MapMode)
+           (java.nio MappedByteBuffer)
            (java.nio.file StandardOpenOption)))
 
 (def index-path "resources/indexes/")
@@ -193,18 +194,19 @@
   "Reads each line byte by byte until newline or end of buffer
    from memory-mapped file at given byte offsets.
    Returns vector of [offset line] maps."
-  [offsets memory-mapped-log]
+  [offsets ^MappedByteBuffer memory-mapped-log]
   (let [buffer-size (.limit memory-mapped-log)
-        newline (byte 10)] ;; ASCII character for \n
+        newline (byte 10)]                                  ;; ASCII character for \n
     (mapv
      (fn [offset]
        (let [sb (StringBuilder.)]
-         (loop [position (int offset)]
-           (if (>= position buffer-size)
+         (.position memory-mapped-log (int offset))
+         (loop []
+           (if (>= (.position memory-mapped-log) buffer-size)
              {:offset offset :line (.toString sb)}
-             (let [current-byte (.get memory-mapped-log (int position))]
+             (let [current-byte (.get memory-mapped-log)]
                (if (= current-byte newline)
                  {:offset offset :line (.toString sb)}
                  (do (.append sb (char current-byte))
-                     (recur (inc position)))))))))
+                     (recur))))))))
      offsets)))
