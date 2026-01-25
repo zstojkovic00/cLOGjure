@@ -17,7 +17,10 @@
     :validate [some? "Invalid date format."]]
    ["-t" "--to TO" "end time filter"
     :parse-fn util/to-unix-timestamp
-    :validate [some? "Invalid date format."]]])
+    :validate [some? "Invalid date format."]]
+   ["-P" "--page PAGE" "500 per page, default 0"
+    :default 0
+    :parse-fn #(Integer/parseInt %)]])
 
 (defn create-index
   "Creates a new index from log file and sets it as current."
@@ -60,6 +63,7 @@
         words arguments
         from (:from options)
         to (:to options)
+        page (:page options)
         search-fn (cond
                     (:prefix options) search/by-prefix-words
                     (:any options) search/by-or-words
@@ -69,7 +73,7 @@
       (nil? @state/current-session-log-path) (println "No index loaded.")
       (empty? words) (println "Usage: search <words> [--any] [--prefix] [--from DATE] [--to DATE]")
       :else
-      (let [matching-lines (search-fn words @state/current-session-log-path from to)]
+      (let [matching-lines (search-fn words @state/current-session-log-path from to page)]
         (when (seq matching-lines)
           (let [sorted-matching-lines (sort-by :score > matching-lines)]
             (println (str "Found " (count sorted-matching-lines) " results:\n"))

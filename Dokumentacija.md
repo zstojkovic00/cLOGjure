@@ -159,6 +159,11 @@ Nakon sto su formirani invertovani i vremenski indeksi, imamo sva neophodna sred
 
 cLOGjure omogucava pretragu reci na tri nacina:
 
+**Paginacija rezultata:**
+
+Rezultati pretrage su sortirani po poziciji bajtova linija u opadajucem redosledu (`sort >`), sto znaci da se najnovije log linije prikazuju prve. Svaka stranica sadrzi do 500 rezultata. Parametar `page` odredjuje koja stranica se vraca (0 = prvih 500, 1 = sledecih 500, itd.). Nakon toga rezultati su sortirani po TF-IDF skoru.
+
+
 **1. Pretraga reci (AND pretraga)** - sve reci iz upita moraju biti prisutne u istoj liniji log fajla. Za svaku rec iz upita pronalaze se odgovarajuce liste pozicija bajtova iz invertovanog indeksa, nakon cega se nad njima racuna presek.
 
 **Presek skupova pozicija bajtova:**
@@ -176,7 +181,7 @@ Funkcija `by-and-words` pronalazi pozicije bajtova za svaku rec, racuna presek (
 
 ```clojure
 (defn by-and-words
-  [words log-path from to]
+  [words log-path from to page]
   (let [[inverted-index timestamp-index memory-mapped-log] (idx/load-or-create-index log-path)
         timestamp-offsets (when (or from to) (idx/get-timestamp-offsets timestamp-index from to))
         words-offsets (mapv (fn [word] (idx/get-inverted-offsets inverted-index word)) words)
@@ -185,17 +190,18 @@ Funkcija `by-and-words` pronalazi pozicije bajtova za svaku rec, racuna presek (
 
         matching-offsets (intersection all-offsets)
 
-        total-lines (count timestamp-index)
-        idf-score (idf total-lines (count matching-offsets))
-        lines (idx/load-index-lines matching-offsets memory-mapped-log)]
-    (if (empty? matching-offsets)
+        latest-matching-offsets (take 500 (drop (* page 500) (sort > matching-offsets)))]
+    (if (empty? latest-matching-offsets)
       (println "No results found.")
-      (mapv
-       (fn [{:keys [offset line]}]
-         {:offset offset
-          :score  (tf-idf (apply + (map (fn [word-frequency] (get word-frequency offset 0)) word-frequencies)) idf-score)
-          :line   line})
-       lines))))
+      (let [total-lines (count timestamp-index)
+            idf-score (idf total-lines (count matching-offsets))
+            lines (idx/load-index-lines latest-matching-offsets memory-mapped-log)]
+        (mapv
+         (fn [{:keys [offset line]}]
+           {:offset offset
+            :score  (tf-idf (apply + (map (fn [word-frequency] (get word-frequency offset 0)) word-frequencies)) idf-score)
+            :line   line})
+         lines)))))
 ```
 
 **2. Pretraga reci (OR pretraga)** - rezultat sadrzi linije koje imaju bilo koju od trazenih reci. Za svaku rec se pronalaze pozicije bajtova, zatim se racuna unija svih skupova.
@@ -215,7 +221,7 @@ Funkcija `by-or-words` radi slicno AND pretrazi, ali umesto preseka koristi unij
 
 ```clojure
 (defn by-or-words
-  [words log-path from to]
+  [words log-path from to page]
   (let [[inverted-index timestamp-index memory-mapped-log] (idx/load-or-create-index log-path)
         timestamp-offsets (when (or from to) (idx/get-timestamp-offsets timestamp-index from to))
         words-offsets (mapv (fn [word] (idx/get-inverted-offsets inverted-index word)) words)
@@ -224,17 +230,18 @@ Funkcija `by-or-words` radi slicno AND pretrazi, ali umesto preseka koristi unij
         union-offsets (union words-offsets)
         matching-offsets (intersection (if timestamp-offsets [union-offsets timestamp-offsets] [union-offsets]))
 
-        total-lines (count timestamp-index)
-        idf-score (idf total-lines (count matching-offsets))
-        lines (idx/load-index-lines matching-offsets memory-mapped-log)]
-    (if (empty? matching-offsets)
+        latest-matching-offsets (take 500 (drop (* page 500) (sort > matching-offsets)))]
+    (if (empty? latest-matching-offsets)
       (println "No results found.")
-      (mapv
-       (fn [{:keys [offset line]}]
-         {:offset offset
-          :score  (tf-idf (apply + (map (fn [word-frequency] (get word-frequency offset 0)) word-frequencies)) idf-score)
-          :line   line})
-       lines))))
+      (let [total-lines (count timestamp-index)
+            idf-score (idf total-lines (count matching-offsets))
+            lines (idx/load-index-lines latest-matching-offsets memory-mapped-log)]
+        (mapv
+         (fn [{:keys [offset line]}]
+           {:offset offset
+            :score  (tf-idf (apply + (map (fn [word-frequency] (get word-frequency offset 0)) word-frequencies)) idf-score)
+            :line   line})
+         lines)))))
 ```
 
 **3. Pretraga po prefiksu** - traze se sve reci koje pocinju zadatim prefiksom. 
@@ -243,7 +250,7 @@ Funkcija `by-prefix-words` koristi `subseq` nad sortiranom mapom da pronadje sve
 
 ```clojure
 (defn by-prefix-words
-  [prefixes log-path from to]
+  [prefixes log-path from to page]
   (let [[inverted-index timestamp-index memory-mapped-log] (idx/load-or-create-index log-path)
         timestamp-offsets (when (or from to) (idx/get-timestamp-offsets timestamp-index from to))
         matching-words (mapcat (fn [prefix]
@@ -257,17 +264,18 @@ Funkcija `by-prefix-words` koristi `subseq` nad sortiranom mapom da pronadje sve
         union-offsets (union words-offsets)
         matching-offsets (intersection (if timestamp-offsets [union-offsets timestamp-offsets] [union-offsets]))
 
-        total-lines (count timestamp-index)
-        idf-score (idf total-lines (count matching-offsets))
-        lines (idx/load-index-lines matching-offsets memory-mapped-log)]
-    (if (empty? matching-offsets)
+        latest-matching-offsets (take 500 (drop (* page 500) (sort > matching-offsets)))]
+    (if (empty? latest-matching-offsets)
       (println "No results found.")
-      (mapv
-       (fn [{:keys [offset line]}]
-         {:offset offset
-          :score  (tf-idf (apply + (map (fn [word-frequency] (get word-frequency offset 0)) word-frequencies)) idf-score)
-          :line   line})
-       lines))))
+      (let [total-lines (count timestamp-index)
+            idf-score (idf total-lines (count matching-offsets))
+            lines (idx/load-index-lines latest-matching-offsets memory-mapped-log)]
+        (mapv
+         (fn [{:keys [offset line]}]
+           {:offset offset
+            :score  (tf-idf (apply + (map (fn [word-frequency] (get word-frequency offset 0)) word-frequencies)) idf-score)
+            :line   line})
+         lines)))))
 ```
 
 **Citanje linija sa pozicije bajtova (Memory-Mapped I/O):**
@@ -435,6 +443,7 @@ clogjure> search error memory              # Linije koje sadrze rec error i rec 
 clogjure> search error warning --any       # Linije koje sadrze rec error ili sadrze rec warning
 clogjure> search err --prefix              # Linije koje sadrze reci sa prefixom err
 clogjure> search error --from 2026-01-19T10:00:00 --to 2026-01-19T12:00:00 # Linije koje sadrze rec error i nalaze se u datom vremenskom opsegu
+clogjure> search error --page 1   # Druga stranica rezultata (501-1000)
 ```
 
 ---

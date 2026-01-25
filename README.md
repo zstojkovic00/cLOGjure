@@ -48,6 +48,7 @@ Options:
   --prefix           Match by word prefix
   --from DATE        Filter matching lines starting from DATE
   --to DATE          Filter matching lines ending at DATE
+  --page N           Result page 500 results per page, default page number 0
 ```
 
 Examples:
@@ -57,5 +58,6 @@ clogjure> search error memory              # Lines containing error AND memory
 clogjure> search error warning --any       # Lines containing error OR warning
 clogjure> search err --prefix              # Lines with words starting with err
 clogjure> search error --from 2026-01-19T10:00:00 --to 2026-01-19T12:00:00
+clogjure> search error --page 1                # Second page of results (501-1000)
 ```
 

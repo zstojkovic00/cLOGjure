@@ -35,7 +35,7 @@
 (defn by-and-words
   "Searches log by multiple words using AND logic with optional time filter.
    Returns vector of {:offset :score :line} maps ranked by TF-IDF."
-  [words log-path from to]
+  [words log-path from to page]
   (let [[inverted-index timestamp-index memory-mapped-log] (idx/load-or-create-index log-path)
         timestamp-offsets (when (or from to) (idx/get-timestamp-offsets timestamp-index from to))
         words-offsets (mapv (fn [word] (idx/get-inverted-offsets inverted-index word)) words)
@@ -44,22 +44,23 @@
 
         matching-offsets (intersection all-offsets)         ;; AND logic, intersection between all words offsets and timestamp offsets, line matches if it survives intersection :)
 
-        total-lines (count timestamp-index)
-        idf-score (idf total-lines (count matching-offsets))
-        lines (idx/load-index-lines matching-offsets memory-mapped-log)]
-    (if (empty? matching-offsets)
+        latest-matching-offsets (take 500 (drop (* page 500) (sort > matching-offsets)))]
+    (if (empty? latest-matching-offsets)
       (println "No results found.")
-      (mapv
-       (fn [{:keys [offset line]}]
-         {:offset offset
-          :score  (tf-idf (apply + (map (fn [word-frequency] (get word-frequency offset 0)) word-frequencies)) idf-score)
-          :line   line})
-       lines))))
+      (let [total-lines (count timestamp-index)
+            idf-score (idf total-lines (count matching-offsets))
+            lines (idx/load-index-lines latest-matching-offsets memory-mapped-log)]
+        (mapv
+         (fn [{:keys [offset line]}]
+           {:offset offset
+            :score  (tf-idf (apply + (map (fn [word-frequency] (get word-frequency offset 0)) word-frequencies)) idf-score)
+            :line   line})
+         lines)))))
 
 (defn by-prefix-words
   "Searches log by multiple words starting with given prefixes with optional time filter.
    Returns vector of {:offset :score :line} maps ranked by TF-IDF."
-  [prefixes log-path from to]
+  [prefixes log-path from to page]
   (let [[inverted-index timestamp-index memory-mapped-log] (idx/load-or-create-index log-path)
         timestamp-offsets (when (or from to) (idx/get-timestamp-offsets timestamp-index from to))
         matching-words (mapcat (fn [prefix]
@@ -73,22 +74,23 @@
         union-offsets (union words-offsets)                 ;; OR logic, union between all prefix matches offsets, line matches if it contains any word with matching prefix
         matching-offsets (intersection (if timestamp-offsets [union-offsets timestamp-offsets] [union-offsets])) ;; then AND with timestamp offsets
 
-        total-lines (count timestamp-index)
-        idf-score (idf total-lines (count matching-offsets))
-        lines (idx/load-index-lines matching-offsets memory-mapped-log)]
-    (if (empty? matching-offsets)
+        latest-matching-offsets (take 500 (drop (* page 500) (sort > matching-offsets)))]
+    (if (empty? latest-matching-offsets)
       (println "No results found.")
-      (mapv
-       (fn [{:keys [offset line]}]
-         {:offset offset
-          :score  (tf-idf (apply + (map (fn [word-frequency] (get word-frequency offset 0)) word-frequencies)) idf-score)
-          :line   line})
-       lines))))
+      (let [total-lines (count timestamp-index)
+            idf-score (idf total-lines (count matching-offsets))
+            lines (idx/load-index-lines latest-matching-offsets memory-mapped-log)]
+        (mapv
+         (fn [{:keys [offset line]}]
+           {:offset offset
+            :score  (tf-idf (apply + (map (fn [word-frequency] (get word-frequency offset 0)) word-frequencies)) idf-score)
+            :line   line})
+         lines)))))
 
 (defn by-or-words
   "Searches log by multiple words using OR logic with optional time filter.
    Returns vector of {:offset :score :line} maps ranked by TF-IDF."
-  [words log-path from to]
+  [words log-path from to page]
   (let [[inverted-index timestamp-index memory-mapped-log] (idx/load-or-create-index log-path)
         timestamp-offsets (when (or from to) (idx/get-timestamp-offsets timestamp-index from to))
         words-offsets (mapv (fn [word] (idx/get-inverted-offsets inverted-index word)) words)
@@ -97,14 +99,15 @@
         union-offsets (union words-offsets)                 ;; OR logic, union between all word offsets, line matches if it contains ANY of the search words
         matching-offsets (intersection (if timestamp-offsets [union-offsets timestamp-offsets] [union-offsets])) ;; then AND with timestamp offsets
 
-        total-lines (count timestamp-index)
-        idf-score (idf total-lines (count matching-offsets))
-        lines (idx/load-index-lines matching-offsets memory-mapped-log)]
-    (if (empty? matching-offsets)
+        latest-matching-offsets (take 500 (drop (* page 500) (sort > matching-offsets)))]
+    (if (empty? latest-matching-offsets)
       (println "No results found.")
-      (mapv
-       (fn [{:keys [offset line]}]
-         {:offset offset
-          :score  (tf-idf (apply + (map (fn [word-frequency] (get word-frequency offset 0)) word-frequencies)) idf-score)
-          :line   line})
-       lines))))
+      (let [total-lines (count timestamp-index)
+            idf-score (idf total-lines (count matching-offsets))
+            lines (idx/load-index-lines latest-matching-offsets memory-mapped-log)]
+        (mapv
+         (fn [{:keys [offset line]}]
+           {:offset offset
+            :score  (tf-idf (apply + (map (fn [word-frequency] (get word-frequency offset 0)) word-frequencies)) idf-score)
+            :line   line})
+         lines)))))
