@@ -73,7 +73,7 @@
       (nil? @state/current-session-log-path) (println "No index loaded.")
       (empty? words) (println "Usage: search <words> [--any] [--prefix] [--from DATE] [--to DATE]")
       :else
-      (let [matching-lines (search-fn words @state/current-session-log-path from to page)]
+      (let [matching-lines (time (search-fn words @state/current-session-log-path from to page))]
         (when (seq matching-lines)
           (let [sorted-matching-lines (sort-by :score > matching-lines)]
             (println (str "Found " (count sorted-matching-lines) " results:\n"))

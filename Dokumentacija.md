@@ -20,9 +20,10 @@ Beograd, 2026. godine
    - 2.2. [Vremenski indeks](#22-vremenski-indeks)
    - 2.3. [Pretraga log fajla](#23-pretraga-log-fajla)
    - 2.4. [Tok sesije i upravljanje stanjem](#24-tok-sesije-i-upravljanje-stanjem)
-3. [Opis koriscenih tehnologija](#3-opis-koriscenih-tehnologija)
-4. [Korisnicko uputstvo](#4-korisnicko-uputstvo)
-5. [Prilog](#5-prilog)
+3. [Testiranje performansi](#3-testiranje-performansi)
+4. [Opis koriscenih tehnologija](#4-opis-koriscenih-tehnologija)
+5. [Korisnicko uputstvo](#5-korisnicko-uputstvo)
+6. [Prilog](#6-prilog)
 
 ---
 
@@ -407,7 +408,22 @@ Memoizacija kesira indekse za sve ucitane log fajlove, ali ne zna koji je trenut
 
 ---
 
-## 3. Opis koriscenih tehnologija
+## 3. Testiranje performansi
+
+Performanse cLOGjure aplikacije su uporedjene sa grep alatom. Za merenje vremena u Clojure-u koriscen je ugradjeni `time` makro, dok je za grep koriscena `time` komanda iz konzole. Testiranje je izvrseno na log fajlu velicine 342MB sa 3.1 miliona linija.
+
+| Rec      | Broj rezultata | grep    | cLOGjure |
+|----------|----------------|---------|----------|
+| error    | 923            | 443 ms  | 17 ms    |
+| spark    | 119188         | 297 ms  | 190 ms   |
+| driver   | 267532         | 433 ms  | 422 ms   |
+| executor | 815458         | 326 ms  | 2334 ms  |
+
+Rezultati pokazuju da cLOGjure ima prednost kod upita sa manjim brojem rezultata, gde invertovani indeks omogucava brz O(1) pristup. Kod upita sa velikim brojem rezultata (naprimer executor sa 800k+), grep postaje brzi jer cLOGjure mora da izvrsi dodatne operacije nad svim pronadjenim offsetima (kreiranje skupova, sortiranje, racunanje TF-IDF skora).
+
+---
+
+## 4. Opis koriscenih tehnologija
 
 - **Clojure** - funkcionalni programski jezik na JVM platformi
 - **Leiningen** - build alat i upravljac zavisnostima za Clojure projekte
@@ -417,7 +433,7 @@ Memoizacija kesira indekse za sve ucitane log fajlove, ali ne zna koji je trenut
 
 ---
 
-## 4. Korisnicko uputstvo
+## 5. Korisnicko uputstvo
 
 ### Pokretanje aplikacije
 ```bash
@@ -448,7 +464,7 @@ clogjure> search error --page 1   # Druga stranica rezultata (501-1000)
 
 ---
 
-## 5. Prilog
+## 6. Prilog
 
 ### Struktura projekta
 
