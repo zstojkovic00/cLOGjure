@@ -64,7 +64,7 @@
   (let [[inverted-index timestamp-index memory-mapped-log] (idx/load-or-create-index log-path)
         timestamp-offsets (when (or from to) (idx/get-timestamp-offsets timestamp-index from to))
         matching-words (mapcat (fn [prefix]
-                                 (take-while (fn [word] (.startsWith word prefix))
+                                 (take-while (fn [^String word] (.startsWith word prefix))
                                              (map key (subseq (:words inverted-index) >= prefix))))
                                prefixes)
 

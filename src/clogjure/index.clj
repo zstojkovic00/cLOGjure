@@ -2,7 +2,8 @@
   (:require [clogjure.util :as util]
             [clojure.java.io :as io]
             [clojure.string :as str])
-  (:import (java.nio.channels FileChannel FileChannel$MapMode)
+  (:import (java.io File Writer)
+           (java.nio.channels FileChannel FileChannel$MapMode)
            (java.nio MappedByteBuffer)
            (java.nio.file StandardOpenOption)))
 
@@ -44,7 +45,7 @@
            (fn [[outer-inverted-acc timestamp-acc current-offset] line]
              (let [[unix-timestamp content] (split-line-by-timestamp line)
                    words (tokenize content)
-                   line-length (count (.getBytes line))
+                   line-length (count (.getBytes ^String line))
                    new-offset (+ current-offset line-length 1)
 
                    updated-timestamp-index (if unix-timestamp
@@ -68,7 +69,7 @@
   "Creates index file path from log path and index type.
    Returns string path."
   [log-path index-type]
-  (let [file (io/file log-path)
+  (let [^File file (io/file log-path)
         filename (.getName file)
         filename-clean (str/replace filename #"\.[^.]+$" "")]
     (str index-path filename-clean "-" (name index-type) ".idx")))
@@ -77,7 +78,7 @@
   "Lists all index entries from registry file.
    Returns map of index-name to log-path."
   []
-  (if (.exists (io/file registry-path))
+  (if (.exists ^File (io/file registry-path))
     (with-open [rdr (io/reader registry-path)]
       (into {}
             (for [line (line-seq rdr)]
@@ -89,19 +90,19 @@
   "Persists in-memory indexes to disk asynchronously.
    Returns a future that completes when indexes and registry have been written."
   [log-path inverted-index timestamp-index]
-  (let [index-name (-> (to-index-path log-path :inverted) io/file .getName)]
+  (let [index-name (.getName ^File (io/file (to-index-path log-path :inverted)))]
     (future
-      (with-open [w (io/writer (to-index-path log-path :timestamp))]
+      (with-open [^Writer w (io/writer (to-index-path log-path :timestamp))]
         (doseq [[offset timestamp] timestamp-index]
           (.write w (str offset " " timestamp "\n"))))
 
-      (with-open [w (io/writer (to-index-path log-path :inverted))]
+      (with-open [^Writer w (io/writer (to-index-path log-path :inverted))]
         (doseq [[word offsets] (:words inverted-index)]
           (.write w (str word " " (str/join " " offsets) "\n"))))
 
       (let [registry (list-registry)]
         (if (nil? (get registry index-name))
-          (with-open [w (io/writer registry-path :append true)]
+          (with-open [^Writer w (io/writer registry-path :append true)]
             (.write w (str index-name " " log-path "\n"))))))))
 
 (defn list-indexes
@@ -109,8 +110,8 @@
    Returns vector of index filenames."
   []
   (filter #(str/ends-with? % "-inverted.idx")
-          (map #(.getName %)
-               (.listFiles (io/file index-path)))))
+          (map #(.getName ^File %)
+               (.listFiles ^File (io/file index-path)))))
 
 (defn load-log-path
   "Loads log path for given index name from registry.
@@ -166,8 +167,8 @@
    Allows efficient random access without kernel/user space data copying.
    Returns a MappedByteBuffer over the entire file."
   [log-path]
-  (let [path (.toPath (io/file log-path))
-        channel (FileChannel/open path (into-array [StandardOpenOption/READ]))
+  (let [path (.toPath ^File (io/file log-path))
+        ^FileChannel channel (FileChannel/open path (into-array [StandardOpenOption/READ]))
         mapped-byte-buffer (.map channel FileChannel$MapMode/READ_ONLY 0 (.size channel))]
     (.close channel)
     mapped-byte-buffer))
@@ -183,7 +184,7 @@
    (fn [log-path]
      (let [inverted-path (to-index-path log-path :inverted)
            memory-mapped-log (memory-map-file log-path)]
-       (if (.exists (io/file inverted-path))
+       (if (.exists ^File (io/file inverted-path))
          (let [[inverted-index timestamp-index] (load-index log-path)]
            [inverted-index timestamp-index memory-mapped-log])
          (let [[inverted-index timestamp-index] (create-index log-path)]
@@ -199,7 +200,7 @@
         newline (byte 10)]                                  ;; ASCII character for \n
     (mapv
      (fn [offset]
-       (let [sb (StringBuilder.)]
+       (let [^StringBuilder sb (StringBuilder.)]
          (.position memory-mapped-log (int offset))
          (loop []
            (if (>= (.position memory-mapped-log) buffer-size)

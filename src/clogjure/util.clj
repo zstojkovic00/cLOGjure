@@ -1,6 +1,6 @@
 (ns clogjure.util
   (:require [clojure.string :as str])
-  (:import (java.time LocalDateTime ZoneId)
+  (:import (java.time LocalDateTime ZoneId ZonedDateTime)
            (java.time.format DateTimeFormatter)))
 
 (def formatters-path "resources/config/timestamp-formats.cfg")
@@ -24,8 +24,8 @@
   Returns unix time in milliseconds or nil."
   [timestamp formatter]
   (try
-    (let [local-dt (LocalDateTime/parse timestamp formatter)
-          zoned-dt (.atZone local-dt (ZoneId/systemDefault))]
+    (let [^LocalDateTime local-dt (LocalDateTime/parse timestamp formatter)
+          ^ZonedDateTime zoned-dt (.atZone local-dt (ZoneId/systemDefault))]
       (.toEpochMilli (.toInstant zoned-dt)))
     (catch Exception _ nil)))
 

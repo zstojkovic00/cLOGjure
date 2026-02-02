@@ -313,7 +313,7 @@ Funkcija `load-index-lines` cita linije direktno iz mapiranog bafera. Za svaki o
                         {:offset offset :line (.toString sb)}
                         (do (.append sb (char current-byte))
                             (recur))))))))
-      offsets)))
+      offsets))
 ```
 
 
@@ -429,16 +429,26 @@ Rezultati pokazuju da cLOGjure ima prednost kod upita sa manjim brojem rezultata
 - **Leiningen** - build alat i upravljac zavisnostima za Clojure projekte
 - **clojure.tools.cli** - biblioteka za parsiranje argumenata komandne linije
 - **Midje** - testing framework za Clojure
-- **Java IO** - za efikasan rad sa fajlovima
-
+- **Java NIO** - za efikasan rad sa fajlovima (Memory-Mapped I/O)
+- **GraalVM native-image** - AOT kompilacija u native executable
 ---
 
 ## 5. Korisnicko uputstvo
+1. [SDKMAN!](https://sdkman.io/)
+2. [Leiningen](https://leiningen.org/)
 
 ### Pokretanje aplikacije
 ```bash
-lein midje ## run tests
+lein midje
 lein run
+```
+### Native Image (GraalVM) [5]
+```bash                                                                                                                                                                                                            
+sdk env install                                                                                                                                                                       
+sdk env                                                                                                                                                                                                
+lein uberjar                                                                                                                                                                                                             
+native-image -jar target/clogjure-0.1.0-SNAPSHOT-standalone.jar -o clogjure --no-fallback --initialize-at-build-time                                                                                                     
+./clogjure 
 ```
 
 ### Dostupne komande
@@ -496,3 +506,5 @@ cLOGjure/
 [3] GNU Grep - https://www.gnu.org/software/grep/
 
 [4] Memory-Mapped Files in Java - https://www.happycoders.eu/java/filechannel-memory-mapped-io-locks/
+
+[5] GraalVM Native Image - https://www.graalvm.org/latest/reference-manual/native-image/

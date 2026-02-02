@@ -13,11 +13,17 @@ Lightweight in-memory full-text search engine for log files. Builds an inverted 
 
 ## Usage
 
-### Docker
+### Prerequisites
+1. [SDKMAN!](https://sdkman.io/)
+2. [Leiningen](https://leiningen.org/)
 
-```bash
-docker build -t clogjure .
-docker run -it clogjure
+### Native Image (GraalVM)
+```bash                                                                                                                                                                                                            
+sdk env install   # install GraalVM from .sdkmanrc                                                                                                                                                                       
+sdk env                                                                                                                                                                                 
+lein uberjar                                                                                                                                                                                                             
+native-image -jar target/clogjure-0.1.0-SNAPSHOT-standalone.jar -o clogjure-linux-x86_64 --no-fallback --initialize-at-build-time                                                                                                     
+./clogjure 
 ```
 
 ### Lein

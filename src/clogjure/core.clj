@@ -5,7 +5,9 @@
             [clogjure.util :as util]
             [clojure.java.io :as io]
             [clojure.string :as str]
-            [clojure.tools.cli]))
+            [clojure.tools.cli])
+  (:gen-class)
+  (:import (java.io File)))
 
 (def search-cli-options
   [["-h" "--help"]
@@ -27,7 +29,7 @@
   [log-path]
   (cond
     (nil? log-path) (println "Usage: index <path-to-log-file>")
-    (not (.exists (io/file log-path))) (println (str "File not found: " log-path))
+    (not (.exists ^File (io/file log-path))) (println (str "File not found: " log-path))
     :else (do
             (idx/load-or-create-index log-path)
             (reset! state/current-session-log-path log-path)
@@ -83,7 +85,7 @@
 (defn clear-screen
   "Clears the terminal screen."
   []
-  (print "\033[H\033[2J")
+  (print "\033[H\033[2J") ;; ANSI espace code
   (flush))
 
 (defn index-status
